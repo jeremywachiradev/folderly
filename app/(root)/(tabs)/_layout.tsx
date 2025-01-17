@@ -1,30 +1,23 @@
 import { Tabs } from "expo-router";
-import { Image, ImageSourcePropType, Text, View } from "react-native";
+import { Text, View, useColorScheme } from "react-native";
+import { Ionicons } from '@expo/vector-icons'; 
 
-import icons from "@/constants/icons";
+import { useGlobalContext } from "@/lib/global-provider";
 
 const TabIcon = ({
   focused,
-  icon,
+  iconName,
   title,
-}: {
-  focused: boolean;
-  icon: ImageSourcePropType;
-  title: string;
+  colorScheme
 }) => (
   <View className="flex-1 mt-3 flex flex-col items-center">
-    <Image
-      source={icon}
-      tintColor={focused ? "#0061FF" : "#666876"}
-      resizeMode="contain"
-      className="size-6"
+    <Ionicons
+      name={iconName}
+      size={24}
+      color={focused ? (colorScheme === 'dark' ? "primary.300" : "black.200") : "black.200"}
     />
     <Text
-      className={`${
-        focused
-          ? "text-primary-300 font-rubik-medium"
-          : "text-black-200 font-rubik"
-      } text-xs w-full text-center mt-1`}
+      className={`${focused ? "text-primary-300 font-rubik-medium" : "text-black-200 font-rubik"} text-xs w-full text-center mt-1`}
     >
       {title}
     </Text>
@@ -32,14 +25,17 @@ const TabIcon = ({
 );
 
 const TabsLayout = () => {
+  const { theme } = useGlobalContext();
+  const colorScheme = useColorScheme(); // React Native hook to get the system theme
+
   return (
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: "white",
+          backgroundColor: theme.colors.background,
           position: "absolute",
-          borderTopColor: "#0061FF1A",
+          borderTopColor: "primary.200",
           borderTopWidth: 1,
           minHeight: 70,
         },
@@ -51,7 +47,7 @@ const TabsLayout = () => {
           title: "Home",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.home} title="Home" />
+            <TabIcon focused={focused} iconName="home" title="Home" colorScheme={colorScheme} />
           ),
         }}
       />
@@ -61,7 +57,7 @@ const TabsLayout = () => {
           title: "Explore",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.search} title="Explore" />
+            <TabIcon focused={focused} iconName="search" title="Explore" colorScheme={colorScheme} />
           ),
         }}
       />
@@ -71,7 +67,7 @@ const TabsLayout = () => {
           title: "Profile",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.person} title="Profile" />
+            <TabIcon focused={focused} iconName="person" title="Profile" colorScheme={colorScheme} />
           ),
         }}
       />

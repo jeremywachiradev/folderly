@@ -1,14 +1,16 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode, useState, useEffect } from "react";
+import { Appearance } from 'react-native';
+import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 
 import { getCurrentUser } from "./appwrite";
 import { useAppwrite } from "./useAppwrite";
-import { Redirect } from "expo-router";
 
 interface GlobalContextType {
   isLogged: boolean;
   user: User | null;
   loading: boolean;
   refetch: () => void;
+  theme: typeof MD3LightTheme | typeof MD3DarkTheme; 
 }
 
 interface User {
@@ -34,6 +36,16 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
   });
 
   const isLogged = !!user;
+  
+  const [theme, setTheme] = useState(Appearance.getColorScheme() === 'dark' ? MD3DarkTheme : MD3LightTheme);
+
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setTheme(colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return (
     <GlobalContext.Provider
@@ -42,6 +54,7 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
         user,
         loading,
         refetch,
+        theme, 
       }}
     >
       {children}

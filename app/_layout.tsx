@@ -1,7 +1,10 @@
-import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import React, { useState, useEffect, useCallback } from 'react';
+
+import { Appearance, StatusBar } from 'react-native';
+import { MD3DarkTheme, MD3LightTheme, Provider as PaperProvider } from 'react-native-paper';
 
 import "./global.css";
 import GlobalProvider from "@/lib/global-provider";
@@ -15,6 +18,15 @@ export default function RootLayout() {
     "Rubik-Regular": require("../assets/fonts/Rubik-Regular.ttf"),
     "Rubik-SemiBold": require("../assets/fonts/Rubik-SemiBold.ttf"),
   });
+  const [theme, setTheme] = useState(Appearance.getColorScheme() === 'dark' ? MD3DarkTheme : MD3LightTheme);
+
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setTheme(colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -27,8 +39,11 @@ export default function RootLayout() {
   }
 
   return (
-    <GlobalProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </GlobalProvider>
+    <PaperProvider theme={theme}>
+      <GlobalProvider>
+        <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} /> 
+        <Stack screenOptions={{ headerShown: false }} />
+      </GlobalProvider>
+    </PaperProvider>
   );
 }

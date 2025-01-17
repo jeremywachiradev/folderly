@@ -1,89 +1,58 @@
-import icons from "@/constants/icons";
-import images from "@/constants/images";
-import { Image, Text, TouchableOpacity, View } from "react-native";
-import { Models } from "react-native-appwrite";
+// components/Cards.tsx
+import React from 'react';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
+import { Asset, MediaType } from 'expo-media-library';
+import { useTheme } from 'react-native-paper';
 
-interface Props {
-  item: Models.Document;
-  onPress?: () => void;
+interface CardProps {
+  item: Asset;
+  onPress: (uri: string) => void;
+  isFolder?: boolean; // Make isFolder optional
 }
 
-export const FeaturedCard = ({ item, onPress }: Props) => {
+const Card: React.FC<CardProps> = ({ item, onPress, isFolder = false }) => { // Provide default value for isFolder
+  const theme = useTheme();
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex flex-col items-start w-60 h-80 relative"
-    >
-      <Image source={{ uri: item.image }} className="size-full rounded-2xl" />
-
+    <Pressable style={styles.card} onPress={() => onPress(item.uri)} android_ripple={{ color: theme.colors.primary['100'] }}>
       <Image
-        source={images.cardGradient}
-        className="size-full rounded-2xl absolute bottom-0"
+        style={styles.thumbnail}
+        source={{ uri: item.uri }}
+        resizeMode="cover"
       />
-
-      <View className="flex flex-row items-center bg-white/90 px-3 py-1.5 rounded-full absolute top-5 right-5">
-        <Image source={icons.star} className="size-3.5" />
-        <Text className="text-xs font-rubik-bold text-primary-300 ml-1">
-          {item.rating}
-        </Text>
+      <View style={styles.info}>
+        <Text style={[styles.name, { color: theme.colors.text }]}>{item.filename}</Text>
+        {isFolder && <Text style={[styles.folderTag, { color: theme.colors.primary['300'] }]}>Folder</Text>}
       </View>
-
-      <View className="flex flex-col items-start absolute bottom-5 inset-x-5">
-        <Text
-          className="text-xl font-rubik-extrabold text-white"
-          numberOfLines={1}
-        >
-          {item.name}
-        </Text>
-        <Text className="text-base font-rubik text-white" numberOfLines={1}>
-          {item.address}
-        </Text>
-
-        <View className="flex flex-row items-center justify-between w-full">
-          <Text className="text-xl font-rubik-extrabold text-white">
-            ${item.price}
-          </Text>
-          <Image source={icons.heart} className="size-5" />
-        </View>
-      </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
-export const Card = ({ item, onPress }: Props) => {
-  return (
-    <TouchableOpacity
-      className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative"
-      onPress={onPress}
-    >
-      <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50">
-        <Image source={icons.star} className="size-2.5" />
-        <Text className="text-xs font-rubik-bold text-primary-300 ml-0.5">
-          {item.rating}
-        </Text>
-      </View>
+export default Card;
 
-      <Image source={{ uri: item.image }} className="w-full h-40 rounded-lg" />
+const styles = StyleSheet.create({
+  card: {
+    flex: 1,
+    margin: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    width: '100%',
+    height: 150,
+  },
+  info: {
+    padding: 10,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: 'bold',
 
-      <View className="flex flex-col mt-2">
-        <Text className="text-base font-rubik-bold text-black-300">
-          {item.name}
-        </Text>
-        <Text className="text-xs font-rubik text-black-100">
-          {item.address}
-        </Text>
+  },
+  folderTag: {
+    marginTop: 4,
+    fontSize: 14,
 
-        <View className="flex flex-row items-center justify-between mt-2">
-          <Text className="text-base font-rubik-bold text-primary-300">
-            ${item.price}
-          </Text>
-          <Image
-            source={icons.heart}
-            className="w-5 h-5 mr-2"
-            tintColor="#191D31"
-          />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
+  },
+});
