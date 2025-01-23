@@ -1,13 +1,45 @@
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useState, useEffect, useCallback } from 'react';
-
-import { Appearance, StatusBar } from 'react-native';
-import { MD3DarkTheme, MD3LightTheme, Provider as PaperProvider } from 'react-native-paper';
+import React, { useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { Provider as PaperProvider } from 'react-native-paper';
+import { ThemeProvider, useTheme } from "@/lib/theme-provider";
 
 import "./global.css";
-import GlobalProvider from "@/lib/global-provider";
+import { AuthProvider } from "@/lib/auth-provider";
+import { CategoryProvider } from "@/lib/category-provider";
+import { SettingsProvider } from "@/lib/settings-provider";
+
+function AppContent() {
+  const { theme, isDarkMode } = useTheme();
+
+  return (
+    <PaperProvider theme={theme}>
+      <StatusBar translucent style="light" backgroundColor="#0f172a" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+          },
+          headerStyle: {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          },
+          headerTitleStyle: {
+            color: isDarkMode ? '#f1f5f9' : '#0f172a',
+            fontFamily: 'Rubik-Medium',
+          },
+        }}
+      >
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="terms" />
+        <Stack.Screen name="(root)" />
+      </Stack>
+    </PaperProvider>
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -18,15 +50,6 @@ export default function RootLayout() {
     "Rubik-Regular": require("../assets/fonts/Rubik-Regular.ttf"),
     "Rubik-SemiBold": require("../assets/fonts/Rubik-SemiBold.ttf"),
   });
-  const [theme, setTheme] = useState(Appearance.getColorScheme() === 'dark' ? MD3DarkTheme : MD3LightTheme);
-
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setTheme(colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme);
-    });
-
-    return () => subscription.remove();
-  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -39,11 +62,14 @@ export default function RootLayout() {
   }
 
   return (
-    <PaperProvider theme={theme}>
-      <GlobalProvider>
-        <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} /> 
-        <Stack screenOptions={{ headerShown: false }} />
-      </GlobalProvider>
-    </PaperProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CategoryProvider>
+          <SettingsProvider>
+            <AppContent />
+          </SettingsProvider>
+        </CategoryProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

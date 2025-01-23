@@ -1,182 +1,106 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useColorScheme } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  Linking,
-  Appearance,
-} from "react-native";
-import { login } from "@/lib/appwrite";
-import { Redirect, useRouter } from "expo-router";
-import { useGlobalContext } from "@/lib/global-provider";
-import icons from "@/constants/icons";
-import images from "@/constants/images";
-import Toast from "react-native-toast-message";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Checkbox, MD3DarkTheme, MD3LightTheme, useTheme  } from "react-native-paper";
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from "react";
+import { View, TouchableOpacity, Image } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Text } from '@/components/ui';
+import { useAuth } from '@/lib/auth-provider';
+import { Ionicons } from '@expo/vector-icons';
 
-const Auth = () => {
+export default function SignInScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme(); 
-  const insets = useSafeAreaInsets();
-  const paperTheme = useTheme(); // Access the theme object
-
-  const { refetch, loading, isLogged } = useGlobalContext();
+  const { signIn } = useAuth();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const value = await AsyncStorage.getItem("hasSeenOnboarding");
-        if (value === "true") {
-          setHasSeenOnboarding(true);
-        }
-      } catch (e) {
-        console.log("Error reading from AsyncStorage:", e);
-      }
-    };
-
-    checkOnboarding();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && isLogged && hasSeenOnboarding) {
-      router.replace("/"); 
-    }
-  }, [isLogged, loading, hasSeenOnboarding, router]);
-
-  const handleLogin = async () => {
+  const handleGoogleSignIn = async () => {
     if (!agreedToTerms) {
-      Toast.show({
-        type: "error",
-        text1: "Agreement Required",
-        text2:
-          "Please agree to the Terms of Use and Privacy Policy before signing in.",
-      });
+      alert("Please agree to the terms and policies to continue");
       return;
     }
-
-    const result = await login();
-    if (result) {
-      refetch(); 
-      try {
-        await AsyncStorage.setItem("hasSeenOnboarding", "true");
-      } catch (e) {
-        console.log("Error saving to AsyncStorage:", e);
-      }
-    } else {
-      Toast.show({
-        type: "error",
-        text1: "Error",
-        text2: "Failed to log in",
-      });
-    }
-  };
-
-  const handleContinueWithoutAccount = async () => {
     try {
-      await AsyncStorage.setItem("hasSeenOnboarding", "true");
-      setHasSeenOnboarding(true);
+      await signIn("example@gmail.com", "password"); // Replace with actual Google Auth
+      router.replace("/(root)/(tabs)");
     } catch (e) {
-      console.log("Error saving to AsyncStorage:", e);
+      console.log("Error signing in:", e);
     }
   };
 
-  if (!loading && isLogged && hasSeenOnboarding) {
-    return <Redirect href="/" />;
-  }
+  const handleContinueAsGuest = () => {
+    router.replace("/(root)/(tabs)");
+  };
 
   return (
-      <SafeAreaView className="bg-white h-full dark:bg-black" style={{paddingTop: insets.top, paddingBottom: insets.bottom}}> 
-        <ScrollView
-        contentContainerStyle={{
-          height: "100%",
-        }}
-      >
-        <View className="relative w-full h-4/6 overflow-hidden">
+    <SafeAreaView className="flex-1 bg-neutral-900">
+      <View className="flex-1 justify-center items-center p-8">
+        <View className="w-64 h-64 mb-8 bg-white/10 rounded-3xl items-center justify-center">
           <Image
-            source={images.onboarding}
-            className="w-full h-full absolute"  
-            resizeMode="cover"                 
-          />
-          <LinearGradient
-            colors={[
-              paperTheme.dark ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 255, 255, 1)', 
-              'transparent', 
-              'transparent', 
-              paperTheme.dark ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 255, 255, 1)'
-            ]}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            locations={[0, 0.2, 0.8, 1]}
+            source={require("@/assets/images/splash.png")}
+            className="w-56 h-56"
+            resizeMode="contain"
           />
         </View>
-        
-          <View className="px-10">
-            <Text className="text-base text-center uppercase font-rubik text-black-200 dark:text-white"> 
-              Welcome To Folderly
-            </Text>
 
-            <Text className="text-3xl font-rubik-bold text-black-300 text-center mt-2 dark:text-white"> 
-              Dive Deeper Into Your
-              <Text className="text-primary-300"> Files</Text>
-            </Text>
+        <Text
+          variant="h1"
+          weight="bold"
+          className="text-center mb-4 text-white"
+        >
+          Sign in to Folderly
+        </Text>
 
-            <TouchableOpacity
-              onPress={handleLogin}
-              className="bg-white shadow-md shadow-zinc-300 rounded-full w-full py-4 mt-5 dark:bg-black" 
-            >
-              <View className="flex flex-row items-center justify-center">
-              
-                <Image
-                  source={icons.google}
-                  className="w-5 h-5"
-                  resizeMode="contain"
-                />
-                <Text className="text-lg font-rubik-medium text-black-300 ml-2 dark:text-white"> 
-                  Continue with Google
-                </Text>
-              </View>
-            </TouchableOpacity>
+        <Text
+          variant="body"
+          className="text-center mb-12 text-neutral-300"
+        >
+          Access your files and settings across all your devices
+        </Text>
 
-            <View className="flex flex-row items-center  mt-3">
-              <Checkbox
-                status={agreedToTerms ? "checked" : "unchecked"}
-                onPress={() => setAgreedToTerms(!agreedToTerms)}
-                color={paperTheme.colors.primary.main} 
-              />
-              <View className="flex flex-row items-center  mt-3">
-                <Text className="text-sm font-rubik text-black-400 dark:text-white"> 
-                  By checking you have read and agreed to the
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {}}
-                >
-                  <Text className="text-sm font-rubik text-black-300 ml-2  underline dark:text-white"> 
-                    Terms & Conditions
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={handleContinueWithoutAccount}
-              className="flex flex-row items-center justify-center mt-5"
-            >
-              <Text className="text-lg font-rubik text-black-400 underline dark:text-white"> 
-                Continue without an account
-              </Text>
+        {/* Terms Agreement */}
+        <TouchableOpacity 
+          onPress={() => setAgreedToTerms(!agreedToTerms)}
+          className="flex-row items-center mb-6 space-x-2"
+        >
+          <View className={`w-5 h-5 rounded border ${agreedToTerms ? 'bg-primary-500 border-primary-500' : 'border-neutral-400'} items-center justify-center`}>
+            {agreedToTerms && <Ionicons name="checkmark" size={16} color="white" />}
+          </View>
+          <View className="flex-row flex-wrap mx-4 ">
+            <Text className="text-neutral-300">I agree to the </Text>
+            <TouchableOpacity onPress={() => router.push('/terms')}>
+              <Text className="text-primary-500 underline">Terms and Policies</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-        
-        <Toast />
-      </SafeAreaView>
-  );
-};
+        </TouchableOpacity>
 
-export default Auth;
+        {/* Google Sign In Button */}
+        <TouchableOpacity
+          onPress={handleGoogleSignIn}
+          className="bg-primary-600 active:bg-primary-600 rounded-lg w-full py-4 shadow-lg"
+        >
+          <View className="flex-row justify-center items-center space-x-4">
+            <Image
+              source={require("@/assets/icons/google.png")}
+              className="w-6 h-6 mx-4"
+              resizeMode="contain"
+            />
+            <Text
+              variant="body"
+              weight="semibold"
+              className="text-white"
+            >
+              Continue with Google
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Continue as Guest Link */}
+        <TouchableOpacity 
+          onPress={handleContinueAsGuest}
+          className="mt-16"
+        >
+          <Text className="text-neutral-400 underline">
+            Continue without an account
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}

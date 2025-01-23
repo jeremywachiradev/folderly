@@ -15,7 +15,15 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#000000" 
-      }
+      },
+      "package": "com.folderly.app",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "MANAGE_EXTERNAL_STORAGE",
+        "MEDIA_LIBRARY",
+        "ACCESS_MEDIA_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,7 +37,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "cover",
-          "backgroundColor": "#000000" ,
+          "backgroundColor": "#000000",
           "enableFullScreenImage_legacy": true
         }
       ],
@@ -44,6 +52,20 @@
             "./assets/fonts/Rubik-Regular.ttf",
             "./assets/fonts/Rubik-SemiBold.ttf"
           ]
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Folderly to access your photos and media.",
+          "savePhotosPermission": "Allow Folderly to save photos and media.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-file-system",
+        {
+          "enableExternalStoragePermission": true
         }
       ]
     ],

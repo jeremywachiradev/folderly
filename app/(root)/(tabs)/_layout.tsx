@@ -1,78 +1,118 @@
+import React from 'react';
 import { Tabs } from "expo-router";
-import { Text, View, useColorScheme } from "react-native";
-import { Ionicons } from '@expo/vector-icons'; 
+import { View } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from "@/lib/theme-provider";
+import { Text, Logo } from "@/components/ui";
 
-import { useGlobalContext } from "@/lib/global-provider";
+interface TabIconProps {
+  focused: boolean;
+  iconName: keyof typeof Ionicons.glyphMap;
+  title: string;
+}
 
-const TabIcon = ({
-  focused,
-  iconName,
-  title,
-  colorScheme
-}) => (
-  <View className="flex-1 mt-3 flex flex-col items-center">
-    <Ionicons
-      name={iconName}
-      size={24}
-      color={focused ? (colorScheme === 'dark' ? "primary.300" : "black.200") : "black.200"}
-    />
-    <Text
-      className={`${focused ? "text-primary-300 font-rubik-medium" : "text-black-200 font-rubik"} text-xs w-full text-center mt-1`}
-    >
-      {title}
-    </Text>
-  </View>
-);
+function TabIcon({ focused, iconName, title }: TabIconProps) {
+  const { isDarkMode } = useTheme();
 
-const TabsLayout = () => {
-  const { theme } = useGlobalContext();
-  const colorScheme = useColorScheme(); // React Native hook to get the system theme
+  return (
+    <View className="flex-1 flex flex-col items-center justify-center">
+      <View className="h-7 flex items-center justify-center">
+        <Ionicons
+          name={focused ? iconName : `${iconName}-outline` as keyof typeof Ionicons.glyphMap}
+          size={26}
+          color={focused ? '#0077ff' : isDarkMode ? '#94a3b8' : '#64748b'}
+        />
+      </View>
+      {focused && (
+        <Text
+          variant="body-sm"
+          weight="medium"
+          color="primary"
+          className="mt-1 truncate max-w-[80px]"
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function LogoTitle() {
+  const { isDarkMode } = useTheme();
+  return (
+    <View className="px-4">
+      <Logo size="sm" variant="horizontal" />
+    </View>
+  );
+}
+
+export default function TabsLayout() {
+  const { isDarkMode } = useTheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: theme.colors.background,
-          position: "absolute",
-          borderTopColor: "primary.200",
-          borderTopWidth: 1,
-          minHeight: 70,
+          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          borderTopColor: isDarkMode ? '#334155' : '#e2e8f0',
+          height: 70,
+          paddingBottom: 12,
+          paddingTop: 8,
+        },
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: '#0077ff',
+        tabBarInactiveTintColor: isDarkMode ? '#94a3b8' : '#64748b',
+        headerStyle: {
+          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          borderBottomWidth: 1,
+          borderBottomColor: isDarkMode ? '#334155' : '#e2e8f0',
+        },
+        headerTitleStyle: {
+          color: isDarkMode ? '#ffffff' : '#0f172a',
+          fontFamily: 'Rubik-Medium',
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
-          headerShown: false,
+          headerTitle: () => <LogoTitle />,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} iconName="home" title="Home" colorScheme={colorScheme} />
+            <TabIcon
+              focused={focused}
+              iconName="folder"
+              title="Categories"
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Explore",
-          headerShown: false,
+          headerTitle: 'Explore',
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} iconName="search" title="Explore" colorScheme={colorScheme} />
+            <TabIcon
+              focused={focused}
+              iconName="compass"
+              title="Explore"
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
-          headerShown: false,
+          headerTitle: 'Profile',
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} iconName="person" title="Profile" colorScheme={colorScheme} />
+            <TabIcon
+              focused={focused}
+              iconName="person"
+              title="Profile"
+            />
           ),
         }}
       />
     </Tabs>
   );
-};
-
-export default TabsLayout;
+}

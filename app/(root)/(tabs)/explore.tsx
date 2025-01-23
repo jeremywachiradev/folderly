@@ -1,16 +1,45 @@
-import { View, Text } from 'react-native';
 import React from 'react';
-import { useTheme } from 'react-native-paper';
+import { View } from 'react-native';
+import { useFileSystem } from '@/lib/hooks/useFileSystem';
+import { EmptyState, Loading } from '@/components/ui';
+import FileList from '@/components/FileList';
 
-const explore = () => {
-  const theme = useTheme();
+export default function ExploreScreen() {
+  const { currentPath, files, isLoading, error, refresh } = useFileSystem();
+
+  if (isLoading) {
+    return <Loading fullScreen text="Loading files..." />;
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        icon="alert-circle"
+        title="Error loading files"
+        description={error}
+      />
+    );
+  }
+
+  if (!files || files.length === 0) {
+    return (
+      <EmptyState
+        icon="folder-open"
+        title="No files found"
+        description="Add files to start organizing them into categories"
+        action={{
+          label: "Upload files",
+          onPress: () => {/* TODO: Implement file upload */},
+          icon: "cloud-upload"
+        }}
+      />
+    );
+  }
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-      <Text style={{ color: theme.colors.onBackground }}>explore</Text> 
+    <View className="flex-1">
+      <FileList directories={[currentPath]} onRefresh={refresh} />
     </View>
   );
-};
-
-export default explore;
+}
 

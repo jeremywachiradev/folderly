@@ -1,165 +1,24 @@
-import icons from "./icons";
-import images from "./images";
-
-export const cards = [
-  {
-    title: "Card 1",
-    location: "Location 1",
-    price: "$100",
-    rating: 4.8,
-    category: "house",
-    image: images.newYork,
-  },
-  {
-    title: "Card 2",
-    location: "Location 2",
-    price: "$200",
-    rating: 3,
-    category: "house",
-    image: images.japan,
-  },
-  {
-    title: "Card 3",
-    location: "Location 3",
-    price: "$300",
-    rating: 2,
-    category: "flat",
-    image: images.newYork,
-  },
-  {
-    title: "Card 4",
-    location: "Location 4",
-    price: "$400",
-    rating: 5,
-    category: "villa",
-    image: images.japan,
-  },
+export const galleryImages = [
+  "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=60&w=640",
+  "https://images.unsplash.com/photo-1638799869566-b17fa794c4de?q=60&w=640",
+  "https://images.unsplash.com/photo-1560185009-dddeb820c7b7?q=60&w=640",
+  "https://images.unsplash.com/photo-1641910532059-ad684fd3049c?q=60&w=640",
 ];
 
-export const featuredCards = [
-  {
-    title: "Featured 1",
-    location: "Location 1",
-    price: "$100",
-    rating: 4.8,
-    image: images.newYork,
-    category: "house",
-  },
-  {
-    title: "Featured 2",
-    location: "Location 2",
-    price: "$200",
-    rating: 3,
-    image: images.japan,
-    category: "flat",
-  },
+export const agentImages = [
+  "https://images.unsplash.com/photo-1691335053879-02096d6ee2ca?q=60&w=640",
+  "https://images.unsplash.com/photo-1544723495-432537d12f6c?q=60&w=640",
+  "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=60&w=640",
 ];
 
-export const categories = [
-  { title: "All", category: "All" },
-  { title: "Houses", category: "House" },
-  { title: "Condos", category: "Condos" },
-  { title: "Duplexes", category: "Duplexes" },
-  { title: "Studios", category: "Studios" },
-  { title: "Villas", category: "Villa" },
-  { title: "Apartments", category: "Apartments" },
-  { title: "Townhomes", category: "Townhomes" },
-  { title: "Others", category: "Others" },
+export const propertiesImages = [
+  "https://images.unsplash.com/photo-1605146768851-eda79da39897?q=60&w=640",
+  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=60&w=640",
+  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=60&w=640",
 ];
 
-export const settings = [
-  {
-    title: "My Bookings",
-    icon: icons.calendar,
-  },
-  {
-    title: "Payments",
-    icon: icons.wallet,
-  },
-  {
-    title: "Profile",
-    icon: icons.person,
-  },
-  {
-    title: "Notifications",
-    icon: icons.bell,
-  },
-  {
-    title: "Security",
-    icon: icons.shield,
-  },
-  {
-    title: "Language",
-    icon: icons.language,
-  },
-  {
-    title: "Help Center",
-    icon: icons.info,
-  },
-  {
-    title: "Invite Friends",
-    icon: icons.people,
-  },
-];
-
-export const facilities = [
-  {
-    title: "Laundry",
-    icon: icons.laundry,
-  },
-  {
-    title: "Car Parking",
-    icon: icons.carPark,
-  },
-  {
-    title: "Sports Center",
-    icon: icons.run,
-  },
-  {
-    title: "Cutlery",
-    icon: icons.cutlery,
-  },
-  {
-    title: "Gym",
-    icon: icons.dumbell,
-  },
-  {
-    title: "Swimming pool",
-    icon: icons.swim,
-  },
-  {
-    title: "Wifi",
-    icon: icons.wifi,
-  },
-  {
-    title: "Pet Center",
-    icon: icons.dog,
-  },
-];
-
-export const gallery = [
-  {
-    id: 1,
-    image: images.newYork,
-  },
-  {
-    id: 2,
-    image: images.japan,
-  },
-  {
-    id: 3,
-    image: images.newYork,
-  },
-  {
-    id: 4,
-    image: images.japan,
-  },
-  {
-    id: 5,
-    image: images.newYork,
-  },
-  {
-    id: 6,
-    image: images.japan,
-  },
-];
+export const reviewImages = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=60&w=640",
+  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=60&w=640",
+  "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=60&w=640",
+]; 

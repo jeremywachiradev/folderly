@@ -1,41 +1,28 @@
 // components/NoResults.tsx
-import React, { useContext } from "react";
-import { View, Text, Image, useColorScheme } from "react-native";
-import { Image as ExpoImage } from "expo-image";
-import { useTheme } from "react-native-paper";
+import React from 'react';
+import { View, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import images from "@/constants/images";
+interface NoResultsProps {
+  title: string;
+  subtitle: string;
+}
 
-const NoResults = () => {
-  const theme = useTheme(); // Using theme from react-native-paper
-  const colorScheme = useColorScheme(); // This will now be used to adjust non-react-native-paper components
-
+const NoResults: React.FC<NoResultsProps> = ({ title, subtitle }) => {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: theme.colors.background }}>
-      <ExpoImage
-        source={images.noResult}
-        style={{ width: '80%', height: 192, resizeMode: 'contain' }}
-      />
-      <Text
-        style={{
-          fontSize: 24,
-          fontFamily: theme.fonts.bold,
-          marginTop: 20,
-          color: theme.colors.onSurface, // Using text color from theme
-        }}
-      >
-        No Media Found
+    <View className="flex-1 justify-center items-center p-4">
+      <View className="w-16 h-16 bg-primary-100 dark:bg-primary-900 rounded-full justify-center items-center mb-4">
+        <Ionicons
+          name="folder-open-outline"
+          size={32}
+          className="text-primary-500"
+        />
+      </View>
+      <Text className="text-xl font-rubik-bold text-black-300 dark:text-white text-center">
+        {title}
       </Text>
-      <Text
-        style={{
-          fontSize: 16,
-          fontFamily: theme.fonts.regular,
-          color: theme.colors.onSurface, // Consistent text color
-          textAlign: 'center',
-          marginTop: 8,
-        }}
-      >
-        Try adjusting your search or selecting different apps.
+      <Text className="text-base font-rubik text-black-400 dark:text-zinc-400 text-center mt-2">
+        {subtitle}
       </Text>
     </View>
   );

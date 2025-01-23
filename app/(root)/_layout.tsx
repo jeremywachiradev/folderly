@@ -1,23 +1,43 @@
 import { Redirect, Slot } from "expo-router";
 import { ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { useGlobalContext } from "@/lib/global-provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-provider";
 
 export default function AppLayout() {
-  const { loading, isLogged } = useGlobalContext();
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+  const { user, isLoading } = useAuth();
 
-  if (loading) {
+  useEffect(() => {
+    checkOnboarding();
+  }, []);
+
+  const checkOnboarding = async () => {
+    try {
+      const value = await AsyncStorage.getItem("hasSeenOnboarding");
+      setHasSeenOnboarding(value === "true");
+    } catch (e) {
+      console.log("Error reading from AsyncStorage:", e);
+      setHasSeenOnboarding(false);
+    }
+  };
+
+  if (hasSeenOnboarding === null || isLoading) {
     return (
-      <SafeAreaView className="bg-white h-full flex justify-center items-center">
-        <ActivityIndicator className="text-primary-300" size="large" />
+      <SafeAreaView className="bg-neutral-900 h-full flex justify-center items-center">
+        <ActivityIndicator color="#0077ff" size="large" />
       </SafeAreaView>
     );
   }
 
-  if (!isLogged) {
+  if (!hasSeenOnboarding) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  if (!user) {
     return <Redirect href="/sign-in" />;
   }
 
-  return <Slot />; 
+  return <Slot />;
 }

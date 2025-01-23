@@ -2,22 +2,8 @@ import React, { createContext, useContext, ReactNode, useState, useEffect } from
 import { Appearance } from 'react-native';
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 
-import { getCurrentUser } from "./appwrite";
-import { useAppwrite } from "./useAppwrite";
-
 interface GlobalContextType {
-  isLogged: boolean;
-  user: User | null;
-  loading: boolean;
-  refetch: () => void;
-  theme: typeof MD3LightTheme | typeof MD3DarkTheme; 
-}
-
-interface User {
-  $id: string;
-  name: string;
-  email: string;
-  avatar: string;
+  theme: typeof MD3LightTheme | typeof MD3DarkTheme;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -27,16 +13,6 @@ interface GlobalProviderProps {
 }
 
 export const GlobalProvider = ({ children }: GlobalProviderProps) => {
-  const {
-    data: user,
-    loading,
-    refetch,
-  } = useAppwrite({
-    fn: getCurrentUser,
-  });
-
-  const isLogged = !!user;
-  
   const [theme, setTheme] = useState(Appearance.getColorScheme() === 'dark' ? MD3DarkTheme : MD3LightTheme);
 
   useEffect(() => {
@@ -44,17 +20,18 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
       setTheme(colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme);
     });
 
-    return () => subscription.remove();
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscription?.remove) {
+        subscription.remove();
+      }
+    };
   }, []);
 
   return (
     <GlobalContext.Provider
       value={{
-        isLogged,
-        user,
-        loading,
-        refetch,
-        theme, 
+        theme,
       }}
     >
       {children}
