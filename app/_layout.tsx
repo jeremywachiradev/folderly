@@ -1,41 +1,34 @@
+import { useEffect } from 'react';
 import { Stack } from "expo-router";
-import { useFonts } from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from "expo-status-bar";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { ThemeProvider, useTheme } from "@/lib/theme-provider";
-
-import "./global.css";
 import { AuthProvider } from "@/lib/auth-provider";
 import { CategoryProvider } from "@/lib/category-provider";
 import { SettingsProvider } from "@/lib/settings-provider";
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import "./global.css";
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 
-function AppContent() {
-  const { theme, isDarkMode } = useTheme();
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
+function AppLayout() {
+  const { theme } = useTheme();
 
   return (
     <PaperProvider theme={theme}>
-      <StatusBar translucent style="light" backgroundColor="#0f172a" />
+      <StatusBar translucent style="light" backgroundColor="transparent" />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: {
-            backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-          },
-          headerStyle: {
-            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-          },
-          headerTitleStyle: {
-            color: isDarkMode ? '#f1f5f9' : '#0f172a',
-            fontFamily: 'Rubik-Medium',
+            backgroundColor: 'transparent',
           },
         }}
       >
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="sign-in" />
-        <Stack.Screen name="terms" />
-        <Stack.Screen name="(root)" />
+        <Stack.Screen name="(tabs)" />
       </Stack>
     </PaperProvider>
   );
@@ -43,12 +36,12 @@ function AppContent() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    "Rubik-Bold": require("../assets/fonts/Rubik-Bold.ttf"),
-    "Rubik-ExtraBold": require("../assets/fonts/Rubik-ExtraBold.ttf"),
-    "Rubik-Light": require("../assets/fonts/Rubik-Light.ttf"),
-    "Rubik-Medium": require("../assets/fonts/Rubik-Medium.ttf"),
-    "Rubik-Regular": require("../assets/fonts/Rubik-Regular.ttf"),
-    "Rubik-SemiBold": require("../assets/fonts/Rubik-SemiBold.ttf"),
+    'Rubik-Light': require('../assets/fonts/Rubik-Light.ttf'),
+    'Rubik-Regular': require('../assets/fonts/Rubik-Regular.ttf'),
+    'Rubik-Medium': require('../assets/fonts/Rubik-Medium.ttf'),
+    'Rubik-SemiBold': require('../assets/fonts/Rubik-SemiBold.ttf'),
+    'Rubik-Bold': require('../assets/fonts/Rubik-Bold.ttf'),
+    'Rubik-ExtraBold': require('../assets/fonts/Rubik-ExtraBold.ttf'),
   });
 
   useEffect(() => {
@@ -66,7 +59,9 @@ export default function RootLayout() {
       <AuthProvider>
         <CategoryProvider>
           <SettingsProvider>
-            <AppContent />
+            <BottomSheetModalProvider>
+              <AppLayout />
+            </BottomSheetModalProvider>
           </SettingsProvider>
         </CategoryProvider>
       </AuthProvider>

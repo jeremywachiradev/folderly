@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Category } from './categoryManager';
 
+const CATEGORIES_STORAGE_KEY = '@folderly/categories';
+
 interface CategoryContextType {
   categories: Category[];
   setCategories: (categories: Category[]) => void;
@@ -9,6 +11,7 @@ interface CategoryContextType {
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   isLoading: boolean;
+  loadCategories: () => Promise<void>;
 }
 
 const CategoryContext = createContext<CategoryContextType | null>(null);
@@ -23,12 +26,17 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
 
   const loadCategories = async () => {
     try {
-      const categoriesJson = await AsyncStorage.getItem('categories');
+      setIsLoading(true);
+      const categoriesJson = await AsyncStorage.getItem(CATEGORIES_STORAGE_KEY);
+
       if (categoriesJson) {
-        setCategories(JSON.parse(categoriesJson));
+        const parsedCategories = JSON.parse(categoriesJson);
+        setCategories(parsedCategories);
+      } else {
+        setCategories([]);
       }
     } catch (error) {
-      console.error('Error loading categories:', error);
+      setCategories([]);
     } finally {
       setIsLoading(false);
     }
@@ -36,17 +44,20 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
 
   const saveCategories = async (newCategories: Category[]) => {
     try {
-      await AsyncStorage.setItem('categories', JSON.stringify(newCategories));
+      await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(newCategories));
+      setCategories(newCategories);
     } catch (error) {
       console.error('Error saving categories:', error);
-      throw error;
     }
   };
 
   const addCategory = async (category: Category) => {
-    const newCategories = [...categories, category];
-    await saveCategories(newCategories);
-    setCategories(newCategories);
+    try {
+      const newCategories = [...categories, category];
+      await saveCategories(newCategories);
+    } catch (error) {
+      console.error('Error adding category:', error);
+    }
   };
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
@@ -71,7 +82,8 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         addCategory,
         updateCategory,
         deleteCategory,
-        isLoading
+        isLoading,
+        loadCategories
       }}
     >
       {children}

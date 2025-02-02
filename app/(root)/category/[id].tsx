@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
+import {  View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Category, getCategories, deleteCategory } from '@/lib/categoryManager';
 import { Header, Loading, EmptyState } from '@/components/ui';
@@ -75,7 +76,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <View className="flex-1 bg-white dark:bg-neutral-900">
+    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
       <Header
         title={category.name}
         showBack
@@ -90,6 +91,6 @@ export default function CategoryPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
-    </View>
+    </SafeAreaView>
   );
 } 

@@ -1,13 +1,16 @@
-import { Redirect, Slot } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-provider";
+import React from 'react';
+import { useTheme } from '@/lib/theme-provider';
 
 export default function AppLayout() {
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
   const { user, isLoading } = useAuth();
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     checkOnboarding();
@@ -39,5 +42,12 @@ export default function AppLayout() {
     return <Redirect href="/sign-in" />;
   }
 
-  return <Slot />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="category/[id]" />
+      <Stack.Screen name="category/new" />
+      <Stack.Screen name="directory-picker" />
+    </Stack>
+  );
 }

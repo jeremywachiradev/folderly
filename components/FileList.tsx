@@ -21,8 +21,9 @@ import FilePreview from './FilePreview';
 import FileOperations from './FileOperations';
 import { getSearchHistory, addToSearchHistory, clearSearchHistory, SearchHistoryItem } from '../lib/searchHistory';
 import { SearchFilter, SIZE_RANGES, DATE_RANGES, isWithinDateRange, isWithinSizeRange } from '../lib/searchFilters';
-import { FileItem, FileType } from '@/lib/fileSystem';
+import { FileItem, FileType, getFilesFromDirectory } from '@/lib/fileSystem';
 import { useTheme } from '@/lib/theme-provider';
+import { hasStoragePermissions, requestAndroidPermissions } from '@/lib/androidDirectories';
 
 interface FileListProps {
   directories: string[];
@@ -99,42 +100,32 @@ export default function FileList({ directories, onRefresh }: FileListProps) {
       setLoading(true);
       const allFiles: FileItem[] = [];
 
-      for (const directory of directories) {
-        try {
-          const contents = await FileSystem.readDirectoryAsync(directory);
-          for (const item of contents) {
-            const path = `${directory}/${item}`;
-            const info = await FileSystem.getInfoAsync(path);
-            if (info.exists && !info.isDirectory) {
-              const extension = item.split('.').pop()?.toLowerCase() || '';
-              let type: FileType = 'other';
-              
-              (Object.entries(FILE_TYPES) as [FileType, readonly string[]][]).forEach(([key, extensions]) => {
-                if (extensions.includes(extension)) {
-                  type = key;
-                }
-              });
-
-              allFiles.push({
-                name: item,
-                path,
-                uri: path,
-                size: info.size || 0,
-                modificationTime: info.modificationTime || Date.now(),
-                type,
-                isDirectory: info.isDirectory || false
-              });
-            }
-          }
-        } catch (error) {
-          console.error(`Error reading directory ${directory}:`, error);
+      // Ensure we have storage permissions
+      const hasPermission = await hasStoragePermissions();
+      if (!hasPermission) {
+        const { granted } = await requestAndroidPermissions();
+        if (!granted) {
+          handleError('Storage permission not granted');
+          return;
         }
       }
 
-      setFiles(sortFiles(allFiles, sortBy, sortOrder));
+      // Load files from each directory
+      for (const directory of directories) {
+        try {
+          const dirFiles = await getFilesFromDirectory(directory);
+          allFiles.push(...dirFiles);
+        } catch (error) {
+          console.error('Error loading directory:', directory, error);
+        }
+      }
+
+      // Sort files by date (most recent first)
+      const sortedFiles = allFiles.sort((a, b) => b.modificationTime - a.modificationTime);
+      setFiles(sortedFiles);
     } catch (error) {
       console.error('Error loading files:', error);
-      Alert.alert('Error', 'Failed to load files');
+      handleError('Failed to load files');
     } finally {
       setLoading(false);
     }

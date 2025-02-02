@@ -1,77 +1,76 @@
 # Folderly
 
-A modern mobile application designed to enhance file accessibility on Android devices, making it easier for users to manage and access their files, particularly in restricted directories.
+A modern file organization app for Android that helps you manage and access your files across different directories.
 
-## 🎯 Purpose
+## Features
 
-Folderly bridges the gap between users and their files on Android devices, particularly addressing the challenges of accessing files in restricted directories like the Android folder. Since recent Android versions have implemented stricter file access policies, Folderly provides a user-friendly solution to manage and access these files efficiently.
-
-## 🔑 Key Features
-
-### File Access and Organization
-- **Custom Categories**: Create and manage personalized categories for different file directories
-- **Default WhatsApp Integration**: Pre-configured access to WhatsApp status directory
-- **Multi-Directory Support**: Add multiple directories to a single category
-- **Color Coding**: Customize category colors for better visual organization
+### Categories
+- Create categories with custom names and colors
+- Add multiple directories to each category
+- View all files from selected categories in a unified feed
+- Toggle category visibility using checkmarks
+- Long press to enter selection mode for managing multiple categories
+- Edit or delete categories individually or in bulk
 
 ### File Management
-- **Smart Filtering**: Filter files by type with all files shown by default
-- **File Operations**: 
-  - Download (copy) files to chosen directories
-  - Share files with other apps
-  - Mass file selection
-  - File sorting capabilities
+- View files from all selected categories in a unified feed
+- Sort files by date, name, or type (ascending/descending)
+- Files are automatically deduplicated if they appear in multiple categories
+- Infinite scroll for smooth browsing of large file collections
+- Preview files with type-specific icons and details
 
-### User Profiles and Sharing
-- **Profile Configurations**: Save and manage directory configurations
-- **Configuration Sharing**: Share your directory setups with other Folderly users
-- **Persistent Settings**: Configurations remain intact even after logging out
+### User Experience
+- Dark/Light mode support
+- Modern and intuitive interface
+- Smooth animations and transitions
+- Efficient file loading with pagination
+- Responsive design that adapts to different screen sizes
 
-## 🚀 Technical Features
-- Built with Expo
-- Modern UI/UX design principles
-- Secure file system access
-- User authentication system
-- Cloud configuration storage
+### Navigation
+- Two main tabs: Home and Profile
+- Home tab: Manage categories and view files
+- Profile tab: User settings and account management
 
-## 🛠️ Development Phases
+## Category Interaction Modes
 
-1. **Core File System Access**
-   - Basic file system integration
-   - Directory access permissions
-   - File listing and browsing
+### Normal Mode
+- Tap a category to view its files in detail
+- Tap the checkmark to toggle category visibility in the unified feed
+- Files from all checked categories appear in the main feed
 
-2. **Category Management**
-   - Category creation and editing
-   - Directory assignment
-   - Color coding system
-   - WhatsApp status default integration
+### Selection Mode (Long Press)
+- Long press a category to enter selection mode
+- Selected categories are highlighted with a border
+- Options appear at the top for bulk actions:
+  - Select All: Select all categories
+  - Invert: Invert current selection
+  - Delete: Delete selected categories
+  - Edit: Edit a single selected category
+- Tap Cancel to exit selection mode
 
-3. **File Operations**
-   - File viewing
-   - Copy/Download functionality
-   - Sharing implementation
-   - Batch operations
+## Installation
 
-4. **User System**
-   - Authentication
-   - Profile management
-   - Configuration storage
-   - Configuration sharing
+1. Download from the Play Store (coming soon)
+2. Grant necessary storage permissions
+3. Start organizing your files!
 
-5. **UI/UX Enhancement**
-   - Modern interface design
-   - Intuitive navigation
-   - Performance optimization
-   - User feedback implementation
+## Requirements
 
-## 📱 Platform Support
-- Android devices
-- Focus on Android restricted directory access
-- Modern Android version compatibility
+- Android 6.0 (API level 23) or higher
+- Storage permissions for accessing files
 
-## 🔒 Security
-- Safe file system access
-- Secure user authentication
-- Protected configuration sharing
-- Privacy-focused design 
+## Privacy & Security
+
+- All file access is local to your device
+- No data is uploaded to external servers
+- Permissions are only used for accessing local storage
+
+## Support
+
+For issues, feature requests, or general feedback:
+- Open an issue on GitHub
+- Contact support at [support email]
+
+## License
+
+[License information] 

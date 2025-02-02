@@ -1,62 +1,48 @@
-export const getFileIcon = (type: string) => {
-  switch (type.toLowerCase()) {
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-    case 'gif':
-      return 'image-outline';
-    case 'mp4':
-    case 'mov':
-    case 'avi':
-      return 'videocam-outline';
-    case 'mp3':
-    case 'wav':
-    case 'm4a':
-      return 'musical-notes-outline';
-    case 'pdf':
-      return 'document-text-outline';
-    default:
-      return 'document-outline';
-  }
-};
+import { format } from 'date-fns';
 
-export const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
+interface FileIcon {
+  icon: 'image-outline' | 'videocam-outline' | 'musical-notes-outline' | 'document-text-outline' | 'document-outline';
+  color: string;
+}
 
-export const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (diffInSeconds < 60) {
-    return 'just now';
+export function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+export function formatDate(timestamp: number): string {
+  return format(new Date(timestamp), 'MMM d, yyyy');
+}
+
+export function getFileIcon(type: string): FileIcon {
+  // Image files
+  if (/^image\//i.test(type)) {
+    return { icon: 'image-outline', color: '#10B981' };
   }
   
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes}m ago`;
+  // Video files
+  if (/^video\//i.test(type)) {
+    return { icon: 'videocam-outline', color: '#F59E0B' };
   }
   
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours}h ago`;
+  // Audio files
+  if (/^audio\//i.test(type)) {
+    return { icon: 'musical-notes-outline', color: '#8B5CF6' };
   }
   
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) {
-    return `${diffInDays}d ago`;
+  // Text files
+  if (/^text\//i.test(type) || /\/(pdf|doc|docx|txt|md|json|xml)$/i.test(type)) {
+    return { icon: 'document-text-outline', color: '#3B82F6' };
   }
   
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `${diffInMonths}mo ago`;
-  }
-  
-  const diffInYears = Math.floor(diffInMonths / 12);
-  return `${diffInYears}y ago`;
-}; 
+  // Default
+  return { icon: 'document-outline', color: '#6B7280' };
+} 

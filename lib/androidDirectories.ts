@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
+import { StorageAccessFramework } from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import * as IntentLauncher from 'expo-intent-launcher';
 
@@ -8,6 +9,7 @@ export interface AndroidDirectory {
   path: string;
   type: 'default' | 'custom';
   color?: string;
+  uri?: string;
 }
 
 // WhatsApp paths for different versions and variants
@@ -22,73 +24,85 @@ const WHATSAPP_PATHS = {
   }
 };
 
-// Define the missing constant
-const MANAGE_ALL_FILES_ACCESS_PERMISSION = 'android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION';
+const PERMISSIONS_KEY = '@folderly/storage_permissions';
+const ROOT_DIRECTORY_KEY = '@folderly/root_directory_uri';
 
-export const getDefaultDirectories = async (): Promise<AndroidDirectory[]> => {
-  if (Platform.OS !== 'android') {
-    return [];
-  }
-
+// Get root level storage access
+export const requestRootStorageAccess = async (): Promise<boolean> => {
   try {
-    const directories: AndroidDirectory[] = [];
+    // Request access to the root storage directory
+    const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync('content://com.android.externalstorage.documents/tree/primary%3A');
     
-    // Check all possible WhatsApp paths
-    const checkPaths = [
-      {
-        paths: [WHATSAPP_PATHS.regular.modern, WHATSAPP_PATHS.regular.legacy],
-        name: 'WhatsApp Status',
-        color: '#25D366' // WhatsApp green
-      },
-      {
-        paths: [WHATSAPP_PATHS.business.modern, WHATSAPP_PATHS.business.legacy],
-        name: 'WhatsApp Business Status',
-        color: '#23D366' // WhatsApp Business green
-      }
-    ];
-
-    for (const { paths, name, color } of checkPaths) {
-      for (const path of paths) {
-        try {
-          const info = await FileSystem.getInfoAsync(path);
-          if (info.exists) {
-            directories.push({
-              name,
-              path,
-              type: 'default',
-              color
-            });
-            // Break inner loop once we find a valid path for this WhatsApp variant
-            break;
-          }
-        } catch (error) {
-          console.debug(`Path ${path} not accessible:`, error);
-        }
-      }
+    if (permission.granted) {
+      await AsyncStorage.setItem(PERMISSIONS_KEY, 'true');
+      await AsyncStorage.setItem(ROOT_DIRECTORY_KEY, permission.directoryUri);
+      return true;
     }
-
-    return directories;
+    return false;
   } catch (error) {
-    console.error('Error getting default directories:', error);
-    return [];
+    console.error('Error requesting root storage access:', error);
+    return false;
   }
 };
 
-export const validateDirectoryAccess = async (path: string): Promise<boolean> => {
+export const hasStoragePermissions = async (): Promise<boolean> => {
   try {
-    // First check if we have necessary permissions
-    const hasPermissions = await requestAndroidPermissions();
+    const permissionsGranted = await AsyncStorage.getItem(PERMISSIONS_KEY);
+    if (permissionsGranted !== 'true') return false;
+
+    // Verify if the permission is still valid
+    const rootUri = await AsyncStorage.getItem(ROOT_DIRECTORY_KEY);
+    if (!rootUri) return false;
+
+    try {
+      await StorageAccessFramework.readDirectoryAsync(rootUri);
+      return true;
+    } catch {
+      // Permission is no longer valid, clear it
+      await AsyncStorage.removeItem(PERMISSIONS_KEY);
+      await AsyncStorage.removeItem(ROOT_DIRECTORY_KEY);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error checking permissions:', error);
+    return false;
+  }
+};
+
+export const requestAndroidPermissions = async (): Promise<{ granted: boolean; directoryUri?: string }> => {
+  try {
+    // Check if we already have permissions
+    const hasPermissions = await hasStoragePermissions();
+    if (hasPermissions) {
+      const rootUri = await AsyncStorage.getItem(ROOT_DIRECTORY_KEY);
+      return { granted: true, directoryUri: rootUri || undefined };
+    }
+
+    // Request root storage access
+    const granted = await requestRootStorageAccess();
+    if (granted) {
+      const rootUri = await AsyncStorage.getItem(ROOT_DIRECTORY_KEY);
+      return { granted: true, directoryUri: rootUri || undefined };
+    }
+
+    return { granted: false };
+  } catch (error) {
+    console.error('Error requesting permissions:', error);
+    return { granted: false };
+  }
+};
+
+export const validateDirectoryAccess = async (uri: string): Promise<boolean> => {
+  try {
+    // First check if we have root permissions
+    const hasPermissions = await hasStoragePermissions();
     if (!hasPermissions) {
-      return false;
+      const { granted } = await requestAndroidPermissions();
+      if (!granted) return false;
     }
 
-    const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists) {
-      return false;
-    }
-
-    // Try to read directory contents to verify access
-    await FileSystem.readDirectoryAsync(path);
+    // Now try to read the directory
+    await StorageAccessFramework.readDirectoryAsync(uri);
     return true;
   } catch (error) {
     console.error('Error validating directory access:', error);
@@ -96,46 +110,64 @@ export const validateDirectoryAccess = async (path: string): Promise<boolean> =>
   }
 };
 
-export const requestAndroidPermissions = async (): Promise<boolean> => {
-  if (Platform.OS !== 'android') {
-    return true;
-  }
-
+export const listDirectoryContents = async (uri: string): Promise<string[]> => {
   try {
-    // Request media library permissions first
-    const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
-    if (mediaStatus !== 'granted') {
-      throw new Error('Media library permission not granted');
+    // Ensure we have permissions
+    const hasPermissions = await hasStoragePermissions();
+    if (!hasPermissions) {
+      const { granted } = await requestAndroidPermissions();
+      if (!granted) return [];
     }
 
-    // For Android 11+ (API 30+), we need MANAGE_EXTERNAL_STORAGE permission
-    if (Platform.Version >= 30) {
-      const canAccess = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      
-      if (!canAccess.granted) {
-        // Open system settings for all files access permission
-        await IntentLauncher.startActivityAsync('android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION');
-        
-        // Re-check permission after settings
-        const recheckedAccess = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!recheckedAccess.granted) {
-          throw new Error('All files access permission not granted');
-        }
-      }
-    }
-    // For Android 10 (API 29), we need scoped storage access
-    else if (Platform.Version === 29) {
-      const { status: storageStatus } = await MediaLibrary.requestPermissionsAsync();
-      if (storageStatus !== 'granted') {
-        throw new Error('Storage permission not granted');
-      }
-    }
-
-    return true;
+    return await StorageAccessFramework.readDirectoryAsync(uri);
   } catch (error) {
-    console.error('Error requesting Android permissions:', error);
-    return false;
+    console.error('Error listing directory contents:', error);
+    return [];
   }
+};
+
+// Function to open Android settings if needed
+export const openAndroidFilesSettings = async () => {
+  try {
+    if (Platform.OS === 'android') {
+      if (Platform.Version >= 30) {
+        await IntentLauncher.startActivityAsync(
+          IntentLauncher.ActivityAction.APPLICATION_SETTINGS
+        );
+      } else {
+        await Linking.openSettings();
+      }
+    }
+  } catch (error) {
+    console.error('Error opening settings:', error);
+    await Linking.openSettings();
+  }
+};
+
+export const getDefaultDirectories = async (): Promise<AndroidDirectory[]> => {
+  if (Platform.OS !== 'android') {
+    return [];
+  }
+
+  const directories: AndroidDirectory[] = [
+    {
+      name: 'Downloads',
+      path: '/storage/emulated/0/Download',
+      type: 'default'
+    },
+    {
+      name: 'Documents',
+      path: '/storage/emulated/0/Documents',
+      type: 'default'
+    },
+    {
+      name: 'Pictures',
+      path: '/storage/emulated/0/Pictures',
+      type: 'default'
+    }
+  ];
+
+  return directories;
 };
 
 export const requestManageAllFilesPermission = async () => {

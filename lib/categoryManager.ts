@@ -161,6 +161,16 @@ export const removeDirectoryFromCategory = async (
   }
 };
 
+export const getCategory = async (id: string): Promise<Category | undefined> => {
+  try {
+    const categories = await getCategories();
+    return categories.find(cat => cat.id === id);
+  } catch (error) {
+    console.error('Error getting category:', error);
+    throw error;
+  }
+};
+
 const saveCategories = async (categories: Category[]): Promise<void> => {
   try {
     await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
