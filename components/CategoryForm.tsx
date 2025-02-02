@@ -6,18 +6,21 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Category, createCategory, updateCategory } from '../lib/categoryManager';
-import { AndroidDirectory } from '../lib/androidDirectories';
+import { AndroidDirectory, hasStoragePermissions, requestAndroidPermissions, openAndroidFilesSettings } from '../lib/androidDirectories';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/lib/theme-provider';
+import { StorageAccessFramework } from 'expo-file-system';
 
 interface CategoryFormProps {
   category?: Category;
   isEditing?: boolean;
+  loading?: boolean;
 }
 
 const DEFAULT_COLORS = [
@@ -31,35 +34,104 @@ const DEFAULT_COLORS = [
   '#000000', // Black
 ];
 
-export default function CategoryForm({ category, isEditing = false }: CategoryFormProps) {
+// Ensure the SAF URI is properly formatted
+const formatSAFUri = (uri: string): string => {
+  // If it's already a proper SAF URI, return as is
+  if (uri.includes('tree/') && !uri.includes('document/')) {
+    return uri;
+  }
+  
+  // Convert document URI to tree URI if needed
+  return uri.replace('document/', 'tree/');
+};
+
+export default function CategoryForm({ category, isEditing = false, loading = false }: CategoryFormProps) {
   const { isDarkMode } = useTheme();
   const [name, setName] = useState(category?.name || '');
   const [selectedColor, setSelectedColor] = useState(category?.color || DEFAULT_COLORS[0]);
-  const [directories, setDirectories] = useState<AndroidDirectory[]>(category?.directories || []);
-  const [loading, setLoading] = useState(false);
+  const [directories, setDirectories] = useState<AndroidDirectory[]>(
+    category?.directories.map(dir => ({
+      ...dir,
+      path: dir.path.startsWith('content://') ? formatSAFUri(dir.path) : dir.path
+    })) || []
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
   const router = useRouter();
 
+  // Update form when category data is loaded
   useEffect(() => {
-    checkForSelectedDirectory();
+    if (category) {
+      setName(category.name);
+      setSelectedColor(category.color);
+      setDirectories(
+        category.directories.map(dir => ({
+          ...dir,
+          path: dir.path.startsWith('content://') ? formatSAFUri(dir.path) : dir.path
+        }))
+      );
+    }
+  }, [category]);
+
+  // Check for selected directories when the form comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      checkForSelectedDirectory();
+    }, [])
+  );
+
+  useEffect(() => {
+    checkPermissions();
   }, []);
+
+  const checkPermissions = async () => {
+    const hasPerms = await hasStoragePermissions();
+    setHasPermission(hasPerms);
+  };
+
+  const requestPermissions = async () => {
+    const { granted } = await requestAndroidPermissions();
+    if (granted) {
+      setHasPermission(true);
+      return true;
+    }
+    return false;
+  };
 
   const checkForSelectedDirectory = async () => {
     try {
-      const selectedDirJson = await AsyncStorage.getItem('@folderly/selected_directory');
-      if (selectedDirJson) {
-        const selectedDir = JSON.parse(selectedDirJson) as AndroidDirectory;
+      const selectedDirsJson = await AsyncStorage.getItem('@folderly/selected_directories');
+      if (selectedDirsJson) {
+        const selectedDirs = JSON.parse(selectedDirsJson) as AndroidDirectory[];
+        // Format the paths if they're SAF URIs
+        const formattedDirs = selectedDirs.map(dir => ({
+          ...dir,
+          path: dir.path.startsWith('content://') ? formatSAFUri(dir.path) : dir.path
+        }));
+        
         setDirectories(prev => {
-          // Check if directory already exists
-          if (prev.some(dir => dir.path === selectedDir.path)) {
-            return prev;
-          }
-          return [...prev, selectedDir];
+          // Filter out any duplicates
+          const newDirs = formattedDirs.filter(newDir => 
+            !prev.some(existingDir => existingDir.path === newDir.path)
+          );
+          return [...prev, ...newDirs];
         });
-        // Clear the selected directory
-        await AsyncStorage.removeItem('@folderly/selected_directory');
+        
+        // Clear the selected directories
+        await AsyncStorage.removeItem('@folderly/selected_directories');
+      }
+
+      // Restore form state if it exists
+      const formStateJson = await AsyncStorage.getItem('@folderly/category_form_state');
+      if (formStateJson) {
+        const formState = JSON.parse(formStateJson);
+        if (!isEditing) {  // Only restore state if not in editing mode
+          setName(formState.name || '');
+          setSelectedColor(formState.selectedColor || DEFAULT_COLORS[0]);
+        }
       }
     } catch (error) {
-      console.error('Error checking for selected directory:', error);
+      console.error('Error checking for selected directories:', error);
     }
   };
 
@@ -69,8 +141,13 @@ export default function CategoryForm({ category, isEditing = false }: CategoryFo
       return;
     }
 
+    if (directories.length === 0) {
+      Alert.alert('Error', 'Please select at least one directory');
+      return;
+    }
+
     try {
-      setLoading(true);
+      setIsSaving(true);
       if (isEditing && category) {
         await updateCategory(category.id, {
           name: name.trim(),
@@ -84,19 +161,62 @@ export default function CategoryForm({ category, isEditing = false }: CategoryFo
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to save category');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const handleAddDirectory = () => {
+  const handleAddDirectory = async () => {
+    if (Platform.OS === 'android' && !hasPermission) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          'Storage Permission Required',
+          'This app needs storage access permission to select directories. Would you like to grant permission in settings?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open Settings',
+              onPress: async () => {
+                await openAndroidFilesSettings();
+              }
+            }
+          ]
+        );
+        return;
+      }
+    }
+
+    // Save the current form state before navigating
+    try {
+      const formState = {
+        name,
+        selectedColor,
+        directories // Save current directories to restore them later
+      };
+      await AsyncStorage.setItem('@folderly/category_form_state', JSON.stringify(formState));
+    } catch (error) {
+      console.error('Error saving form state:', error);
+    }
+
     router.push({
-      pathname: '/(root)/directory-picker'
+      pathname: '/(root)/directory-picker',
+      params: {
+        mode: 'multiple'
+      }
     });
   };
 
   const handleRemoveDirectory = (path: string) => {
     setDirectories(prev => prev.filter(dir => dir.path !== path));
   };
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="large" color={isDarkMode ? '#fff' : '#000'} />
+      </View>
+    );
+  }
 
   return (
     <View className={`flex-1 ${isDarkMode ? 'bg-neutral-900' : 'bg-gray-50'}`}>
@@ -139,9 +259,14 @@ export default function CategoryForm({ category, isEditing = false }: CategoryFo
 
           {/* Directories */}
           <View>
-            <Text className={`mb-2 ${isDarkMode ? 'text-neutral-300' : 'text-gray-600'}`}>
-              Directories
-            </Text>
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className={`${isDarkMode ? 'text-neutral-300' : 'text-gray-600'}`}>
+                Directories
+              </Text>
+              <Text className={`${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                {directories.length} selected
+              </Text>
+            </View>
             <View className="space-y-2">
               {directories.map((dir) => (
                 <View
@@ -154,33 +279,32 @@ export default function CategoryForm({ category, isEditing = false }: CategoryFo
                     className={`flex-1 ${isDarkMode ? 'text-neutral-100' : 'text-neutral-900'}`}
                     numberOfLines={1}
                   >
-                    {dir.path}
+                    {dir.name}
                   </Text>
                   <TouchableOpacity
                     onPress={() => handleRemoveDirectory(dir.path)}
-                    className="ml-2"
+                    className="ml-2 p-2"
                   >
                     <Ionicons
                       name="close-circle"
-                      size={24}
-                      color={isDarkMode ? '#ef4444' : '#dc2626'}
+                      size={20}
+                      color={isDarkMode ? '#64748b' : '#94a3b8'}
                     />
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
-
             <TouchableOpacity
               onPress={handleAddDirectory}
-              className={`mt-2 p-4 rounded-lg border-2 border-dashed ${
+              className={`mt-2 p-4 rounded-lg border ${
                 isDarkMode
-                  ? 'border-neutral-700 active:bg-neutral-800'
-                  : 'border-gray-300 active:bg-gray-100'
+                  ? 'border-neutral-700 bg-neutral-800'
+                  : 'border-neutral-200 bg-white'
               }`}
             >
               <Text
                 className={`text-center ${
-                  isDarkMode ? 'text-neutral-300' : 'text-gray-600'
+                  isDarkMode ? 'text-neutral-300' : 'text-neutral-600'
                 }`}
               >
                 Add Directory
@@ -191,25 +315,23 @@ export default function CategoryForm({ category, isEditing = false }: CategoryFo
       </ScrollView>
 
       {/* Submit Button */}
-      <View className={`p-4 border-t ${
-        isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-gray-200'
-      }`}>
+      <View
+        className={`p-4 border-t ${
+          isDarkMode ? 'border-neutral-800' : 'border-neutral-200'
+        }`}
+      >
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={isSaving}
           className={`p-4 rounded-lg ${
-            isDarkMode
-              ? 'bg-primary-600 active:bg-primary-700'
-              : 'bg-primary-500 active:bg-primary-600'
-          } ${loading ? 'opacity-50' : ''}`}
+            isSaving
+              ? 'bg-neutral-400'
+              : 'bg-primary-600'
+          }`}
         >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-white text-center font-medium">
-              {isEditing ? 'Update Category' : 'Create Category'}
-            </Text>
-          )}
+          <Text className="text-white text-center font-medium">
+            {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Category'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
