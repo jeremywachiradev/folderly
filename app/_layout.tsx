@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-provider";
 import { CategoryProvider } from "@/lib/category-provider";
 import { SettingsProvider } from "@/lib/settings-provider";
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "./global.css";
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -55,16 +56,18 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <CategoryProvider>
-          <SettingsProvider>
-            <BottomSheetModalProvider>
-              <AppLayout />
-            </BottomSheetModalProvider>
-          </SettingsProvider>
-        </CategoryProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <AuthProvider>
+          <CategoryProvider>
+            <SettingsProvider>
+              <BottomSheetModalProvider>
+                <AppLayout />
+              </BottomSheetModalProvider>
+            </SettingsProvider>
+          </CategoryProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
