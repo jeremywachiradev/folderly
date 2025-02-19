@@ -16,7 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { StorageAccessFramework } from 'expo-file-system';
-import { saveFile, getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
+import { saveFile, getSaveDirectory, setSaveDirectory, getFileStats } from '@/lib/fileSystem';
 import { formatFileSize, formatDate, getFileName, formatDisplayName, formatDisplayPath } from '@/lib/utils';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -690,44 +690,48 @@ export default function FileViewerScreen() {
         // Decode the file URI
         const decodedUri = atob(id as string);
         
-        // Verify file exists and is accessible
-        const fileInfo = await FileSystem.getInfoAsync(decodedUri);
-        if (!fileInfo.exists) {
+        // Find the file in the file list first
+        const existingFile = allFiles.find(f => f.uri === decodedUri);
+        if (existingFile) {
+          setCurrentFile(existingFile);
+          setMediaUri(decodedUri);
+          setIsMediaLoading(false);
+          return;
+        }
+        
+        // If not found in the list, get file stats using the same function as file list
+        const fileStats = await getFileStats(decodedUri);
+        if (!fileStats) {
           throw new Error('File not found or inaccessible');
         }
 
-        try {
-          // Get file metadata
-          const name = decodeURIComponent(decodedUri.split('/').pop() || '');
-          const extension = name.split('.').pop()?.toLowerCase() || '';
-          
-          // Get MIME type based on extension
-          const getMimeType = (ext: string): string => {
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image/jpeg';
-            if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) return 'video/mp4';
-            if (['mp3', 'wav', 'm4a'].includes(ext)) return 'audio/mpeg';
-            if (['pdf'].includes(ext)) return 'application/pdf';
-            if (['doc', 'docx'].includes(ext)) return 'application/msword';
-            if (['txt'].includes(ext)) return 'text/plain';
-            return 'application/octet-stream';
-          };
+        // Get file metadata
+        const name = decodeURIComponent(decodedUri.split('/').pop() || '');
+        const extension = name.split('.').pop()?.toLowerCase() || '';
+        
+        // Get MIME type based on extension
+        const getMimeType = (ext: string): string => {
+          if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image/jpeg';
+          if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) return 'video/mp4';
+          if (['mp3', 'wav', 'm4a'].includes(ext)) return 'audio/mpeg';
+          if (['pdf'].includes(ext)) return 'application/pdf';
+          if (['doc', 'docx'].includes(ext)) return 'application/msword';
+          if (['txt'].includes(ext)) return 'text/plain';
+          return 'application/octet-stream';
+        };
 
-          const newFile: FileItem = {
-            path: decodedUri,
-            uri: decodedUri,
-            name,
-            type: getMimeType(extension),
-            size: fileInfo.size || 0,
-            modifiedTime: fileInfo.modificationTime || Date.now(),
-            categoryId: ''
-          };
+        const newFile: FileItem = {
+          path: decodedUri,
+          uri: decodedUri,
+          name,
+          type: getMimeType(extension),
+          size: fileStats.size,
+          modifiedTime: fileStats.modificationTime,
+          categoryId: ''
+        };
 
-          setCurrentFile(newFile);
-          setMediaUri(decodedUri);
-        } catch (error) {
-          console.error('Error loading file:', error);
-          throw error;
-        }
+        setCurrentFile(newFile);
+        setMediaUri(decodedUri);
       } catch (error) {
         console.error('Error loading file:', error);
         setMediaError(error instanceof Error ? error.message : 'Failed to load file');
@@ -737,7 +741,7 @@ export default function FileViewerScreen() {
     };
 
     loadFile();
-  }, [id]);
+  }, [id, allFiles]);
 
   const handleShare = async () => {
     if (!file) return;
@@ -748,8 +752,25 @@ export default function FileViewerScreen() {
         return;
       }
 
-      await Sharing.shareAsync(file.uri);
+      // Create a temporary file if needed (for content:// URIs)
+      let shareUri = file.uri;
+      if (file.uri.startsWith('content://')) {
+        const tempFile = `${FileSystem.cacheDirectory}${file.name}`;
+        await FileSystem.copyAsync({
+          from: file.uri,
+          to: tempFile
+        });
+        shareUri = tempFile;
+      }
+
+      // Share the file
+      await Sharing.shareAsync(shareUri, {
+        mimeType: file.type,
+        dialogTitle: `Share ${file.name}`,
+        UTI: file.type // for iOS
+      });
     } catch (error) {
+      console.error('Share error:', error);
       showToast('error', 'Failed to share file. Please try again.');
     }
   };

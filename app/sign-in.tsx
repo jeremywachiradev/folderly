@@ -7,6 +7,7 @@ import { Text } from '@/components/ui';
 import { useAuth } from '@/lib/auth-provider';
 import { useTheme } from '@/lib/theme-provider';
 import { Ionicons } from '@expo/vector-icons';
+import { showToast } from '@/lib/notifications';
 
 // Initialize WebBrowser and enable Google sign-in
 WebBrowser.maybeCompleteAuthSession();
@@ -52,7 +53,7 @@ export default function SignInScreen() {
 
   const handleGoogleSignIn = async () => {
     if (!agreedToTerms) {
-      alert("Please agree to the terms and policies to continue");
+      showToast('error', "Please agree to the terms and policies to continue");
       return;
     }
     
@@ -66,7 +67,7 @@ export default function SignInScreen() {
       if (e instanceof Error) {
         console.error('Error details:', e.message);
       }
-      alert('Failed to start sign in. Please try again.');
+      showToast('error', 'Failed to start sign in. Please try again.');
       setIsAuthenticating(false);
     }
   };
@@ -87,7 +88,7 @@ export default function SignInScreen() {
       if (error instanceof Error) {
         console.error('Error details:', error.message);
       }
-      alert('Failed to continue as guest. Please try again.');
+      showToast('error', 'Failed to continue as guest. Please try again.');
       setIsAuthenticating(false);
     }
   };

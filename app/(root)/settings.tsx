@@ -8,11 +8,13 @@ import { Text, Card } from '@/components/ui';
 import { getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
 import { showDialog, showToast } from '@/lib/notifications';
+import { Portal, Modal as PaperModal } from 'react-native-paper';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { isDarkMode } = useTheme();
   const [saveDir, setSaveDir] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     loadSaveDirectory();
@@ -36,27 +38,20 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleResetSaveDirectory = async () => {
-    const result = await showDialog({
-      title: 'Reset Save Directory',
-      message: 'Are you sure you want to reset the save directory? You will be prompted to choose a new directory the next time you save a file.',
-      buttons: [
-        { text: 'Cancel', style: 'cancel', onPress: () => {} },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await setSaveDirectory('');
-              setSaveDir(null);
-              showToast('success', 'Save directory has been reset');
-            } catch (error) {
-              showToast('error', 'Failed to reset save directory');
-            }
-          }
-        }
-      ]
-    });
+  const handleResetSaveDirectory = () => {
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = async () => {
+    try {
+      await setSaveDirectory('');
+      setSaveDir(null);
+      showToast('success', 'Save directory has been reset');
+    } catch (error) {
+      showToast('error', 'Failed to reset save directory');
+    } finally {
+      setShowResetConfirm(false);
+    }
   };
 
   return (
@@ -143,6 +138,51 @@ export default function SettingsScreen() {
             </View>
           </Card>
         </ScrollView>
+
+        {/* Reset Confirmation Modal */}
+        <Portal>
+          <PaperModal
+            visible={showResetConfirm}
+            onDismiss={() => setShowResetConfirm(false)}
+            contentContainerStyle={{
+              backgroundColor: isDarkMode ? '#171717' : 'white',
+              margin: 20,
+              padding: 20,
+              borderRadius: 16,
+            }}
+          >
+            <View>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                  Reset Save Directory
+                </Text>
+                <TouchableOpacity onPress={() => setShowResetConfirm(false)}>
+                  <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+                Are you sure you want to reset the save directory? You will be prompted to choose a new directory the next time you save a file.
+              </Text>
+
+              <View className="flex-row justify-end space-x-4">
+                <TouchableOpacity 
+                  onPress={() => setShowResetConfirm(false)}
+                  className="px-4 py-2"
+                >
+                  <Text className="text-neutral-500">Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  onPress={handleConfirmReset}
+                  className="bg-red-500 px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-white font-medium">Reset</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </PaperModal>
+        </Portal>
       </View>
     </SafeAreaView>
   );

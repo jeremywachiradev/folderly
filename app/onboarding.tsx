@@ -5,9 +5,11 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Text } from '@/components/ui';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/lib/theme-provider';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { isDarkMode } = useTheme();
 
   const handleGetStarted = async () => {
     try {
@@ -18,13 +20,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  const gradientColors = isDarkMode 
+    ? ['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)'] as const
+    : ['transparent', 'transparent', 'transparent', 'rgba(241, 245, 249, 0.2)', 'rgb(241, 245, 249)'] as const;
+
   return (
-    <SafeAreaView className="flex-1 bg-neutral-900">
+    <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-neutral-900' : 'bg-white'}`}>
       <View className="flex-1 justify-center items-center p-8">
         <View className="relative w-[420px] h-[420px] mb-8">
           {/* Top gradient */}
           <LinearGradient
-            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            colors={gradientColors}
             locations={[0, 0.2, 0.5, 0.8, 1]}
             style={{
               position: 'absolute',
@@ -40,7 +46,7 @@ export default function OnboardingScreen() {
           />
           {/* Left gradient */}
           <LinearGradient
-            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            colors={gradientColors}
             locations={[0, 0.2, 0.5, 0.8, 1]}
             style={{
               position: 'absolute',
@@ -56,7 +62,7 @@ export default function OnboardingScreen() {
           />
           {/* Right gradient */}
           <LinearGradient
-            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            colors={gradientColors}
             locations={[0, 0.2, 0.5, 0.8, 1]}
             style={{
               position: 'absolute',
@@ -72,7 +78,7 @@ export default function OnboardingScreen() {
           />
           {/* Bottom gradient */}
           <LinearGradient
-            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            colors={gradientColors}
             locations={[0, 0.2, 0.5, 0.8, 1]}
             style={{
               position: 'absolute',
@@ -98,15 +104,14 @@ export default function OnboardingScreen() {
         <Text
           variant="h1"
           weight="bold"
-          className="text-center mb-4 text-white flex-row items-center justify-center"
+          className={`text-center mb-4 ${isDarkMode ? 'text-white' : 'text-neutral-900'} flex-row items-center justify-center`}
         >
           Welcome to{' '}<Text variant="h1" weight="bold" className="text-[#0077ff]">Folderly</Text>
         </Text>
         
-
         <Text
           variant="body"
-          className="text-center mb-12 text-neutral-300"
+          className={`text-center mb-12 ${isDarkMode ? 'text-neutral-300' : 'text-neutral-600'}`}
         >
           Organize and manage your files efficiently with easy access to your important directories
         </Text>

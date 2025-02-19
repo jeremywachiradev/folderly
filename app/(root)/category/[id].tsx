@@ -12,6 +12,7 @@ import { listFiles } from '@/lib/fileManager';
 import { FileList } from '@/components/FileList/index';
 import { SortModal } from '@/components/SortModal';
 import { showDialog, showToast } from '@/lib/notifications';
+import { Modal as PaperModal, Portal } from 'react-native-paper';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = SCREEN_WIDTH / 2;
@@ -92,25 +93,13 @@ export default function CategoryScreen() {
   const handleDeleteCategory = async () => {
     if (!category) return;
 
-    const result = await showDialog({
-      title: 'Delete Category',
-      message: `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
-      buttons: [
-        { text: 'Cancel', style: 'cancel', onPress: () => {} },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCategory(category.id);
-              router.back();
-            } catch (error) {
-              showToast('error', 'Failed to delete category');
-            }
-          }
-        }
-      ]
-    });
+    try {
+      await deleteCategory(category.id);
+      showToast('success', 'Category deleted successfully');
+      router.back();
+    } catch (error) {
+      showToast('error', 'Failed to delete category');
+    }
   };
 
   const handleLoadMore = useCallback(() => {
@@ -156,6 +145,12 @@ export default function CategoryScreen() {
     outputRange: [0, -headerHeight + 64],
     extrapolate: 'clamp'
   });
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDeletePress = () => {
+    setShowDeleteConfirm(true);
+  };
 
   if (!category) return null;
 
@@ -207,7 +202,7 @@ export default function CategoryScreen() {
                 color={isDarkMode ? '#ffffff' : '#000000'} 
               />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleDeleteCategory}>
+            <TouchableOpacity onPress={handleDeletePress}>
               <Ionicons 
                 name="trash-outline" 
                 size={24} 
@@ -258,7 +253,7 @@ export default function CategoryScreen() {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  onPress={handleDeleteCategory}
+                  onPress={handleDeletePress}
                   className="p-2"
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -346,6 +341,51 @@ export default function CategoryScreen() {
           currentSort={sortOption}
           onSortChange={handleSortChange}
         />
+
+        {/* Delete Confirmation Modal */}
+        <Portal>
+          <PaperModal
+            visible={showDeleteConfirm}
+            onDismiss={() => setShowDeleteConfirm(false)}
+            contentContainerStyle={{
+              backgroundColor: isDarkMode ? '#171717' : 'white',
+              margin: 20,
+              padding: 20,
+              borderRadius: 16,
+            }}
+          >
+            <View>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                  Delete Category
+                </Text>
+                <TouchableOpacity onPress={() => setShowDeleteConfirm(false)}>
+                  <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+                Are you sure you want to delete "{category?.name}"? This action cannot be undone.
+              </Text>
+
+              <View className="flex-row justify-end space-x-4">
+                <TouchableOpacity 
+                  onPress={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2"
+                >
+                  <Text className="text-neutral-500">Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  onPress={handleDeleteCategory}
+                  className="bg-red-500 px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-white font-medium">Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </PaperModal>
+        </Portal>
       </Animated.View>
     </SafeAreaView>
   );

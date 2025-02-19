@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useTheme, ThemePreference } from '@/lib/theme-provider';
 import { exportConfig, importConfig } from '@/lib/configShare';
 import { Button, Card, Text } from '@/components/ui';
 import { showDialog, showToast } from '@/lib/notifications';
+import { Portal, Modal as PaperModal } from 'react-native-paper';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -17,6 +18,8 @@ export default function ProfileScreen() {
   const { categories, setCategories } = useCategories();
   const { settings } = useSettings();
   const { themePreference, setThemePreference, isDarkMode } = useTheme();
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [importedConfig, setImportedConfig] = useState<any>(null);
 
   useEffect(() => {
     if (!user) {
@@ -36,16 +39,7 @@ export default function ProfileScreen() {
   const handleExportConfig = async () => {
     try {
       if (categories.length === 0) {
-        await showDialog({
-          title: 'No Categories',
-          message: 'You have no categories to export. Please create some categories first.',
-          buttons: [
-            {
-              text: 'OK',
-              onPress: () => {},
-            }
-          ]
-        });
+        showToast('error', 'You have no categories to export. Please create some categories first.');
         return;
       }
 
@@ -61,35 +55,14 @@ export default function ProfileScreen() {
 
   const handleImportConfig = async () => {
     try {
-      const importedConfig = await importConfig();
+      const config = await importConfig();
       
-      if (!importedConfig) {
+      if (!config) {
         return; // User cancelled or error was already handled
       }
 
-      // Confirm with user before overwriting
-      const result = await showDialog({
-        title: 'Import Configuration',
-        message: `This will replace your current categories with ${importedConfig.categories.length} imported categories. Do you want to continue?`,
-        buttons: [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {},
-          },
-          {
-            text: 'Import',
-            onPress: async () => {
-              try {
-                await setCategories(importedConfig.categories);
-                showToast('success', `Successfully imported ${importedConfig.categories.length} categories.`);
-              } catch (error) {
-                showToast('error', 'Failed to save imported categories. Please try again.');
-              }
-            }
-          }
-        ]
-      });
+      setImportedConfig(config);
+      setShowImportConfirm(true);
     } catch (error) {
       showToast(
         'error',
@@ -97,6 +70,18 @@ export default function ProfileScreen() {
           ? error.message
           : 'Failed to import configuration. Please make sure the file is a valid Folderly configuration.'
       );
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    try {
+      await setCategories(importedConfig.categories);
+      showToast('success', `Successfully imported ${importedConfig.categories.length} categories.`);
+    } catch (error) {
+      showToast('error', 'Failed to save imported categories. Please try again.');
+    } finally {
+      setShowImportConfirm(false);
+      setImportedConfig(null);
     }
   };
 
@@ -116,6 +101,9 @@ export default function ProfileScreen() {
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-neutral-900">
       <ScrollView className="flex-1">
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
+          <Text variant="h4" weight="medium" className="text-neutral-900 dark:text-white">
+            Profile
+          </Text>
           <TouchableOpacity
             onPress={() => router.push('/settings')}
             className="p-2"
@@ -203,6 +191,62 @@ export default function ProfileScreen() {
           </View>
         </Card>
       </ScrollView>
+
+      {/* Import Confirmation Modal */}
+      <Portal>
+        <PaperModal
+          visible={showImportConfirm}
+          onDismiss={() => {
+            setShowImportConfirm(false);
+            setImportedConfig(null);
+          }}
+          contentContainerStyle={{
+            backgroundColor: isDarkMode ? '#171717' : 'white',
+            margin: 20,
+            padding: 20,
+            borderRadius: 16,
+          }}
+        >
+          <View>
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                Import Configuration
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  setShowImportConfirm(false);
+                  setImportedConfig(null);
+                }}
+              >
+                <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+              This will replace your current categories with {importedConfig?.categories?.length || 0} imported categories. Do you want to continue?
+            </Text>
+
+            <View className="flex-row justify-end space-x-4">
+              <TouchableOpacity 
+                onPress={() => {
+                  setShowImportConfirm(false);
+                  setImportedConfig(null);
+                }}
+                className="px-4 py-2"
+              >
+                <Text className="text-neutral-500">Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={handleConfirmImport}
+                className="bg-primary-500 px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white font-medium">Import</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </PaperModal>
+      </Portal>
     </SafeAreaView>
   );
 }

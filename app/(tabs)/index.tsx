@@ -1,6 +1,6 @@
 // Home.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Modal, Dimensions, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Dimensions, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCategories } from '@/lib/category-provider';
@@ -24,6 +24,7 @@ import { ResizeMode } from 'expo-av';
 import { useFileStore } from '@/lib/file-store';
 import { FileList } from '@/components/FileList/index';
 import { showDialog, showToast } from '@/lib/notifications';
+import { Modal as PaperModal, Portal } from 'react-native-paper';
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -234,7 +235,7 @@ export default function HomeScreen() {
     });
   };
 
-  const handleDeleteCategories = () => {
+  const handleDeleteCategories = async () => {
     if (selectedModeCategories.size === 0) return;
     
     const categoryNames = Array.from(selectedModeCategories)
@@ -242,29 +243,23 @@ export default function HomeScreen() {
       .filter(Boolean)
       .join(', ');
 
-    showDialog({
-      title: 'Delete Categories',
-      message: `Are you sure you want to delete these categories?\n\n${categoryNames}`,
-      buttons: [
-        { text: 'Cancel', style: 'cancel', onPress: () => {} },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const id of selectedModeCategories) {
-                await deleteCategory(id);
-              }
-              setIsSelectionMode(false);
-              setSelectedModeCategories(new Set());
-              loadCategories();
-            } catch (error) {
-              showToast('error', 'Failed to delete categories');
-            }
-          }
-        }
-      ]
-    });
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      for (const id of selectedModeCategories) {
+        await deleteCategory(id);
+      }
+      setIsSelectionMode(false);
+      setSelectedModeCategories(new Set());
+      loadCategories();
+      showToast('success', 'Categories deleted successfully');
+    } catch (error) {
+      showToast('error', 'Failed to delete categories');
+    } finally {
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handleSortPress = () => {
@@ -679,34 +674,49 @@ export default function HomeScreen() {
           />
 
           {/* Delete Confirmation Modal */}
-          <Modal
-            visible={showDeleteConfirm}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowDeleteConfirm(false)}
-          >
-            <View className="flex-1 bg-black/50 items-center justify-center">
-              <View className="bg-white dark:bg-neutral-800 rounded-lg p-4 m-4">
-                <Text variant="h4" weight="semibold" className="text-neutral-900 dark:text-white mb-2">
-                  Delete Categories?
-                </Text>
-                <Text className="text-neutral-600 dark:text-neutral-400 mb-4">
-                  Are you sure you want to delete {categoriesToDelete.length} categories? This action cannot be undone.
-                </Text>
-                <View className="flex-row justify-end">
-                  <TouchableOpacity
-                    onPress={() => setShowDeleteConfirm(false)}
-                    className="mr-4"
-                  >
-                    <Text className="text-neutral-600 dark:text-neutral-400">Cancel</Text>
+          <Portal>
+            <PaperModal
+              visible={showDeleteConfirm}
+              onDismiss={() => setShowDeleteConfirm(false)}
+              contentContainerStyle={{
+                backgroundColor: isDarkMode ? '#171717' : 'white',
+                margin: 20,
+                padding: 20,
+                borderRadius: 16,
+              }}
+            >
+              <View>
+                <View className="flex-row justify-between items-center mb-4">
+                  <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                    Delete Categories
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowDeleteConfirm(false)}>
+                    <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleDeleteSelected}>
-                    <Text className="text-red-500">Delete</Text>
+                </View>
+
+                <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+                  Are you sure you want to delete these categories? This action cannot be undone.
+                </Text>
+
+                <View className="flex-row justify-end space-x-4">
+                  <TouchableOpacity 
+                    onPress={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2"
+                  >
+                    <Text className="text-neutral-500">Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    onPress={handleConfirmDelete}
+                    className="bg-red-500 px-4 py-2 rounded-lg"
+                  >
+                    <Text className="text-white font-medium">Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </Modal>
+            </PaperModal>
+          </Portal>
         </>
       )}
     </SafeAreaView>
