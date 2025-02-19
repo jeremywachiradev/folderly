@@ -1,6 +1,6 @@
 // Home.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Modal, Dimensions, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCategories } from '@/lib/category-provider';
@@ -12,15 +12,24 @@ import { FileItem as FileItemComponent } from '@/components/FileItem';
 import { listFiles } from '@/lib/fileManager';
 import { deleteCategory } from '@/lib/categoryManager';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FileViewer } from '@/components/FileViewer';
 import { useRef } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { FileItem as FileItemType } from '@/types';
 import { saveFile, saveFiles, getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
+import { getFileIcon, formatFileSize, formatDate, getFileName } from '@/lib/utils';
+import { Image } from 'expo-image';
+import { Video } from 'expo-av';
+import { ResizeMode } from 'expo-av';
+import { useFileStore } from '@/lib/file-store';
+import { FileList } from '@/components/FileList/index';
+import { showDialog, showToast } from '@/lib/notifications';
+
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_SIZE = SCREEN_WIDTH / 2;
 
 function LogoTitle() {
-  const { isDarkMode } = useTheme();
   return (
     <View className="px-4">
       <Logo size="sm" variant="horizontal" />
@@ -30,26 +39,25 @@ function LogoTitle() {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { categories, isLoading, loadCategories } = useCategories();
+  const { categories, isLoading: isCategoriesLoading, loadCategories } = useCategories();
   const { isDarkMode } = useTheme();
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedModeCategories, setSelectedModeCategories] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
-  const [allFiles, setAllFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [categoriesToDelete, setCategoriesToDelete] = useState<string[]>([]);
+  const categoryListRef = useRef<any>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isFileSelectionMode, setIsFileSelectionMode] = useState(false);
-  const [currentFile, setCurrentFile] = useState<FileItem | null>(null);
-  const [currentFileIndex, setCurrentFileIndex] = useState(-1);
-  const bottomSheetRef = useRef<any>(null);
-  const [checkedCategories, setCheckedCategories] = useState<Set<string>>(new Set());
-  const categoryListRef = useRef<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Initialize selected categories
   useEffect(() => {
@@ -57,15 +65,8 @@ export default function HomeScreen() {
     setSelectedCategories(initialSelected);
   }, [categories]);
 
-  // Initialize checked categories
-  useEffect(() => {
-    const initialChecked = new Set(categories.map(cat => cat.id));
-    setCheckedCategories(initialChecked);
-  }, [categories]);
-
   // Load files when categories or sort option changes
   useEffect(() => {
-    // Only reload files when sort option changes or when categories array changes (not selection)
     loadFiles(1, true);
   }, [sortOption]);
 
@@ -83,15 +84,19 @@ export default function HomeScreen() {
     }
   }, [selectedFiles, isFileSelectionMode]);
 
-  // Clear selection when screen loses focus (user navigates away)
+  // Update effect to clear selection when view mode changes
+  useEffect(() => {
+    setIsFileSelectionMode(false);
+    setSelectedFiles(new Set());
+  }, [viewMode]);
+
+  // Update effect to clear selection when screen loses focus
   useFocusEffect(
     React.useCallback(() => {
-      // This runs when screen comes into focus
-      
       return () => {
-        // This runs when screen loses focus
-        setIsSelectionMode(false);
-        setSelectedCategories(new Set());
+        setIsFileSelectionMode(false);
+        setSelectedFiles(new Set());
+        setIsSelectionMode(false); // Only clear selection mode, not the actual selections
       };
     }, [])
   );
@@ -101,12 +106,12 @@ export default function HomeScreen() {
       if (!hasMore && !reset) return;
       if (pageNum === 1) {
         setIsLoadingFiles(true);
-        setAllFiles([]); // Clear only on explicit refresh
+        setFiles([]); // Clear only on explicit refresh
       } else {
         setIsLoadingMore(true);
       }
 
-      const checkedCats = categories.filter(cat => checkedCategories.has(cat.id));
+      const checkedCats = categories.filter(cat => selectedCategories.has(cat.id));
       // Remove duplicate directories by using a Set with the path as key
       const uniqueDirectories = Array.from(
         new Set(
@@ -134,7 +139,7 @@ export default function HomeScreen() {
         return acc;
       }, [] as typeof files);
 
-      setAllFiles(prev => {
+      setFiles(prev => {
         if (reset) return uniqueFiles;
         // Ensure we don't add duplicates when loading more
         const newFiles = uniqueFiles.filter(
@@ -164,7 +169,7 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (id: string) => {
     if (isSelectionMode) {
-      setSelectedCategories(prev => {
+      setSelectedModeCategories(prev => {
         const newSet = new Set(prev);
         if (newSet.has(id)) {
           newSet.delete(id);
@@ -187,15 +192,15 @@ export default function HomeScreen() {
     
     // Only allow checkmark toggle if not in selection mode
     if (!isSelectionMode) {
-      setCheckedCategories(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+      setSelectedCategories(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+        return newSet;
+      });
       // Force category list to update
       categoryListRef.current?.prepareForLayoutAnimationRender();
       // Update files based on checked categories
@@ -205,7 +210,7 @@ export default function HomeScreen() {
 
   const handleCategoryLongPress = (id: string) => {
     setIsSelectionMode(true);
-    setSelectedCategories(new Set([id]));
+    setSelectedModeCategories(new Set([id]));
   };
 
   const handleDeleteSelected = () => {
@@ -230,36 +235,36 @@ export default function HomeScreen() {
   };
 
   const handleDeleteCategories = () => {
-    if (selectedCategories.size === 0) return;
+    if (selectedModeCategories.size === 0) return;
     
-    const categoryNames = Array.from(selectedCategories)
+    const categoryNames = Array.from(selectedModeCategories)
       .map(id => categories.find(c => c.id === id)?.name)
       .filter(Boolean)
       .join(', ');
 
-    Alert.alert(
-      'Delete Categories',
-      `Are you sure you want to delete these categories?\n\n${categoryNames}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: 'Delete Categories',
+      message: `Are you sure you want to delete these categories?\n\n${categoryNames}`,
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
-              for (const id of selectedCategories) {
-        await deleteCategory(id);
-      }
-      setIsSelectionMode(false);
-              setSelectedCategories(new Set());
-      loadCategories();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to delete categories');
-    }
+              for (const id of selectedModeCategories) {
+                await deleteCategory(id);
+              }
+              setIsSelectionMode(false);
+              setSelectedModeCategories(new Set());
+              loadCategories();
+            } catch (error) {
+              showToast('error', 'Failed to delete categories');
+            }
           }
         }
       ]
-    );
+    });
   };
 
   const handleSortPress = () => {
@@ -272,46 +277,66 @@ export default function HomeScreen() {
 
   // Memoize visible files to prevent unnecessary re-renders
   const visibleFiles = useMemo(() => {
-    return allFiles.map(file => ({
-      ...file,
-      displayName: `${file.name} (${categories.find(c => c.id === file.categoryId)?.name || 'Unknown'})`
-    }));
-  }, [allFiles, categories]);
+    return files.map(file => {
+      // Extract the actual file name from the URI
+      const uriParts = file.uri.split('/');
+      const fileName = uriParts[uriParts.length - 1];
+      const cleanFileName = decodeURIComponent(fileName);
+      
+      // Get the clean directory path
+      const pathParts = file.uri.split('/document/')[1]?.split('/') || [];
+      const cleanPath = pathParts.slice(0, -1).join('/');
+      
+      return {
+        ...file,
+        name: cleanFileName,
+        displayPath: cleanPath,
+        displayName: cleanFileName
+      };
+    });
+  }, [files]);
 
-  const handleFilePress = (file: FileItem, index: number) => {
+  // Optimized file opening handler
+  const handleFilePress = useCallback((file: FileItemType) => {
     if (isFileSelectionMode) {
-      setSelectedFiles(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(file.path)) {
-          newSet.delete(file.path);
-        } else {
-          newSet.add(file.path);
+      if (selectedFiles.has(file.path)) {
+        const newSelectedFiles = new Set(selectedFiles);
+        newSelectedFiles.delete(file.path);
+        setSelectedFiles(newSelectedFiles);
+        // Deactivate selection mode if no files are selected
+        if (newSelectedFiles.size === 0) {
+          setIsFileSelectionMode(false);
         }
-        return newSet;
-      });
+      } else {
+        setSelectedFiles(new Set([...selectedFiles, file.path]));
+      }
     } else {
-      setCurrentFile(file);
-      setCurrentFileIndex(index);
-      bottomSheetRef.current?.present();
+      router.push(`/file/${encodeURIComponent(file.path)}`);
     }
-  };
+  }, [isFileSelectionMode, selectedFiles, router]);
+
+  const handleInverseSelection = useCallback(() => {
+    const newSelectedFiles = new Set(
+      visibleFiles
+        .filter(file => !selectedFiles.has(file.path))
+        .map(file => file.path)
+    );
+    setSelectedFiles(newSelectedFiles);
+    // Deactivate selection mode if no files are selected after inverse
+    if (newSelectedFiles.size === 0) {
+      setIsFileSelectionMode(false);
+    }
+  }, [visibleFiles, selectedFiles]);
 
   const handleFileLongPress = (file: FileItem) => {
+    // Just enter selection mode and select the file
     setIsFileSelectionMode(true);
     setSelectedFiles(new Set([file.path]));
-  };
-
-  const handleFileNavigate = (index: number) => {
-    if (index >= 0 && index < visibleFiles.length) {
-      setCurrentFile(visibleFiles[index]);
-      setCurrentFileIndex(index);
-    }
   };
 
   const handleFileDelete = async (file: FileItem) => {
     try {
       // Implement file deletion logic
-      bottomSheetRef.current?.dismiss();
       loadFiles(1, true);
     } catch (error) {
       Alert.alert('Error', 'Failed to delete file');
@@ -321,7 +346,6 @@ export default function HomeScreen() {
   const handleFileRename = async (file: FileItem, newName: string) => {
     try {
       // Implement file renaming logic
-      bottomSheetRef.current?.dismiss();
       loadFiles(1, true);
     } catch (error) {
       Alert.alert('Error', 'Failed to rename file');
@@ -374,7 +398,7 @@ export default function HomeScreen() {
       Alert.alert('Error', 'Failed to save files');
     }
     setIsFileSelectionMode(false);
-    setSelectedFiles(new Set());
+    setSelectedCategories(new Set());
   };
 
   const handleSaveButtonPress = () => {
@@ -387,11 +411,11 @@ export default function HomeScreen() {
       <Text variant="h4" weight="semibold" className="text-neutral-900 dark:text-white">
         Categories
       </Text>
-      {isSelectionMode && selectedCategories.size > 0 && (
+      {isSelectionMode && selectedModeCategories.size > 0 && (
         <View className="flex-row">
           <TouchableOpacity
             onPress={() => {
-              setSelectedCategories(new Set(categories.map(c => c.id)));
+              setSelectedModeCategories(new Set(categories.map(c => c.id)));
             }}
             className="mr-4"
           >
@@ -402,10 +426,10 @@ export default function HomeScreen() {
               const allIds = new Set(categories.map(c => c.id));
               const invertedSelection = new Set(
                 categories
-                  .filter(c => !selectedCategories.has(c.id))
+                  .filter(c => !selectedModeCategories.has(c.id))
                   .map(c => c.id)
               );
-              setSelectedCategories(invertedSelection);
+              setSelectedModeCategories(invertedSelection);
             }}
             className="mr-4"
           >
@@ -413,34 +437,18 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
-              setSelectedCategories(new Set());
               setIsSelectionMode(false);
+              setSelectedModeCategories(new Set());
             }}
             className="mr-4"
           >
-            <Text className="text-primary-600">Unselect All</Text>
+            <Text className="text-primary-600">Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDeleteCategories}
             className="mr-4"
           >
             <Text className="text-red-500">Delete</Text>
-          </TouchableOpacity>
-          {selectedCategories.size === 1 && (
-            <TouchableOpacity
-              onPress={() => handleEditCategory(Array.from(selectedCategories)[0])}
-              className="mr-4"
-            >
-              <Text className="text-primary-600">Edit</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() => {
-              setIsSelectionMode(false);
-              setSelectedCategories(new Set());
-            }}
-          >
-            <Text className="text-neutral-600 dark:text-neutral-400">Cancel</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -453,23 +461,23 @@ export default function HomeScreen() {
       onLongPress={() => handleCategoryLongPress(category.id)}
       activeOpacity={0.7}
       className={`mr-4 p-3 min-w-[180px] rounded-lg ${
-        isSelectionMode && selectedCategories.has(category.id)
+        isSelectionMode && selectedModeCategories.has(category.id)
           ? 'border-2 border-primary-500/50'  // Add border for selected items
           : 'border-2 border-transparent'      // Transparent border for unselected
       }`}
       style={{
-        backgroundColor: isSelectionMode && selectedCategories.has(category.id)
+        backgroundColor: isSelectionMode && selectedModeCategories.has(category.id)
           ? 'rgba(0, 119, 255, 0.15)'
           : isDarkMode
           ? `${category.color}15`
           : `${category.color}10`,
-        shadowColor: isSelectionMode && selectedCategories.has(category.id)
+        shadowColor: isSelectionMode && selectedModeCategories.has(category.id)
           ? '#0077ff'
           : 'transparent',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
-        elevation: isSelectionMode && selectedCategories.has(category.id) ? 4 : 0
+        elevation: isSelectionMode && selectedModeCategories.has(category.id) ? 4 : 0
       }}
     >
       <View className="flex-row items-center justify-between">
@@ -501,97 +509,39 @@ export default function HomeScreen() {
           onPress={(e) => handleCheckmarkPress(e, category.id)}
           className="p-2 -mr-2"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          disabled={isSelectionMode}
+          disabled={isSelectionMode} // Disable checkmark interaction in selection mode
         >
           <Ionicons
-            name={checkedCategories.has(category.id) ? "checkmark-circle" : "checkmark-circle-outline"}
+            name={selectedCategories.has(category.id) ? "checkmark-circle" : "checkmark-circle-outline"}
             size={26}
-            color={checkedCategories.has(category.id) ? category.color : isDarkMode ? '#64748b' : '#94a3b8'}
+            color={selectedCategories.has(category.id) ? category.color : isDarkMode ? '#64748b' : '#94a3b8'}
+            style={{ opacity: isSelectionMode ? 0.5 : 1 }} // Dim the checkmark in selection mode
           />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 
-  const renderFileItem = ({ item, index }: { item: FileItemType; index: number }) => (
-    <TouchableOpacity
-      onPress={() => {
-        if (isFileSelectionMode) {
-          setSelectedFiles(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(item.path)) {
-              newSet.delete(item.path);
-              // If no files are selected, exit selection mode
-              if (newSet.size === 0) {
-                setIsFileSelectionMode(false);
-              }
-            } else {
-              newSet.add(item.path);
-            }
-            return newSet;
-          });
-        } else {
-          setCurrentFile(item);
-          setCurrentFileIndex(index);
-          bottomSheetRef.current?.present();
-        }
-      }}
-      onLongPress={() => {
-        if (!isFileSelectionMode) {
-          setIsFileSelectionMode(true);
-          setSelectedFiles(new Set([item.path]));
-        }
-      }}
-      activeOpacity={0.7}
-      className={`px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 ${
-        isFileSelectionMode && selectedFiles.has(item.path)
-          ? 'bg-primary-50 dark:bg-primary-900'
-          : ''
-      }`}
-    >
-      <FileItemComponent
-        file={item}
-        selected={isFileSelectionMode && selectedFiles.has(item.path)}
-      />
-    </TouchableOpacity>
-  );
-
   const renderFileList = () => (
-    <FlashList<FileItemType>
-      data={visibleFiles}
-      renderItem={({ item, index }: { item: FileItemType; index: number }) => renderFileItem({ item, index })}
-      keyExtractor={(item: FileItemType) => item.path}
-      estimatedItemSize={80}
-      onEndReached={() => {
+    <FileList
+      files={visibleFiles}
+      isLoading={isLoadingFiles}
+      isLoadingMore={isLoadingMore}
+      hasMore={hasMore}
+      onLoadMore={() => {
         if (!isLoadingMore && hasMore) {
           loadFiles(page + 1);
         }
       }}
-      onEndReachedThreshold={0.2}
-      refreshControl={
-        <RefreshControl
-          refreshing={isLoadingFiles}
-          onRefresh={() => loadFiles(1, true)}
-          colors={[isDarkMode ? '#0077ff' : '#0077ff']}
-          tintColor={isDarkMode ? '#0077ff' : '#0077ff'}
-        />
-      }
-      ListEmptyComponent={
-        !isLoadingFiles && visibleFiles.length === 0 ? (
-          <EmptyState
-            icon="document-outline"
-            title="No files found"
-            description="Select categories to view files"
-          />
-        ) : null
-      }
-      ListFooterComponent={() => (
-        isLoadingMore && hasMore ? (
-          <View className="py-4">
-            <Loading text="Loading more..." />
-          </View>
-        ) : null
-      )}
+      onRefresh={() => loadFiles(1, true)}
+      sortOption={sortOption}
+      onSortChange={handleSortChange}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      showSortModal={showSortModal}
+      onSortModalChange={setShowSortModal}
     />
   );
 
@@ -600,7 +550,7 @@ export default function HomeScreen() {
       ref={categoryListRef}
                 horizontal
                 data={categories}
-      extraData={[selectedCategories, checkedCategories, isSelectionMode]} // Add state dependencies
+      extraData={[selectedCategories, isSelectionMode]} // Add state dependencies
       renderItem={({ item }: { item: Category }) => renderCategoryItem({ item })}
       keyExtractor={(item: Category) => item.id}
       estimatedItemSize={180}
@@ -622,72 +572,41 @@ export default function HomeScreen() {
   );
 
   const renderFileSelectionOptions = () => (
-                  <View className="px-4 py-2 flex-row justify-between items-center border-b border-neutral-200 dark:border-neutral-800">
-                    <View className="flex-row">
-                      <TouchableOpacity
-                        onPress={() => {
-                          setSelectedFiles(new Set(visibleFiles.map(f => f.path)));
-                        }}
-                        className="mr-4"
-                      >
-                        <Text className="text-primary-600">Select All</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const invertedSelection = new Set(
-                            visibleFiles
-                              .filter(f => !selectedFiles.has(f.path))
-                              .map(f => f.path)
-                          );
-                          setSelectedFiles(invertedSelection);
-                        }}
-                        className="mr-4"
-                      >
-                        <Text className="text-primary-600">Invert</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          Alert.alert(
-                            'Delete Files',
-                            `Are you sure you want to delete ${selectedFiles.size} files?`,
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              {
-                                text: 'Delete',
-                                style: 'destructive',
-                                onPress: async () => {
-                                  // Implement bulk delete
-                                  setIsFileSelectionMode(false);
-                                  setSelectedFiles(new Set());
-                                  loadFiles(1, true);
-                                }
-                              }
-                            ]
-                          );
-                        }}
-                        className="mr-4"
-                      >
-                        <Text className="text-red-500">Delete</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-          onPress={handleSaveButtonPress}
-                        className="mr-4"
-                      >
-                        <Text className="text-primary-600">Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setIsFileSelectionMode(false);
-                        setSelectedFiles(new Set());
-                      }}
-                    >
-                      <Text className="text-neutral-600 dark:text-neutral-400">Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
+    <View className="flex-row items-center justify-between px-4 py-2">
+      <View className="flex-row items-center">
+        <Text className="text-neutral-900 dark:text-white font-medium">
+          {selectedFiles.size} selected
+        </Text>
+      </View>
+      <View className="flex-row items-center">
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedFiles(new Set(visibleFiles.map(file => file.path)));
+          }}
+          className="px-4"
+        >
+          <Text className="text-primary-500">Select All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={handleInverseSelection}
+          className="px-4"
+        >
+          <Text className="text-primary-500">Inverse</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedFiles(new Set());
+            setIsFileSelectionMode(false);
+          }}
+          className="pl-4"
+        >
+          <Text className="text-primary-500">Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
-  if (isLoading) {
+  if (isCategoriesLoading) {
     return (
       <View className="flex-1 bg-neutral-50 dark:bg-neutral-900">
         <Loading fullScreen text="Loading..." />
@@ -701,7 +620,6 @@ export default function HomeScreen() {
       <View className={`px-4 py-3 border-b ${isDarkMode ? 'border-neutral-800 bg-neutral-900' : 'border-neutral-200 bg-white'}`}>
         <View className="flex-row items-center justify-between">
           <LogoTitle />
-         
         </View>
       </View>
 
@@ -720,30 +638,22 @@ export default function HomeScreen() {
         <>
           <View className="flex-1">
             {/* Categories List */}
-            <View className="pt-4">
+            <View>
               {renderCategorySelectionHeader()}
               {renderCategoryList()}
-                    </View>
+            </View>
 
-            {/* Filters Button */}
-            <View className="px-4 py-3 flex-row justify-end border-b border-neutral-200 dark:border-neutral-800">
-              <TouchableOpacity
-                onPress={handleSortPress}
-                className="flex-row items-center"
-              >
-                <Ionicons
-                  name="filter-outline"
-                  size={20}
-                  color={isDarkMode ? '#ffffff' : '#000000'}
-                />
-                <Text className="ml-2 text-neutral-900 dark:text-white">
-                  Sort & Filter
-                </Text>
-              </TouchableOpacity>
+            {/* File Selection Options */}
+            {isFileSelectionMode && (
+              <View className="border-b border-neutral-200 dark:border-neutral-800">
+                {renderFileSelectionOptions()}
               </View>
+            )}
 
             {/* Files List */}
-            {renderFileList()}
+            <View style={{ flex: 1 }}>
+              {renderFileList()}
+            </View>
           </View>
 
           {/* Floating Add Button */}
@@ -797,23 +707,6 @@ export default function HomeScreen() {
               </View>
             </View>
           </Modal>
-
-          {currentFile && (
-            <FileViewer
-              ref={bottomSheetRef}
-              file={currentFile}
-              files={visibleFiles}
-              currentIndex={currentFileIndex}
-              onNavigate={handleFileNavigate}
-              onDelete={handleFileDelete}
-              onRename={handleFileRename}
-              onSave={handleFileSave}
-              onClose={() => {
-                setCurrentFile(null);
-                setCurrentFileIndex(-1);
-              }}
-            />
-          )}
         </>
       )}
     </SafeAreaView>

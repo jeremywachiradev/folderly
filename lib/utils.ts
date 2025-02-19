@@ -45,4 +45,37 @@ export function getFileIcon(type: string): FileIcon {
   
   // Default
   return { icon: 'document-outline', color: '#6B7280' };
+}
+
+export function getFileName(path: string): string {
+  if (!path) return '';
+  const parts = path.split('/');
+  return parts[parts.length - 1];
+}
+
+export function formatDisplayName(name: string): string {
+  if (!name) return '';
+  // Extract just the file ID and extension
+  const parts = name.split('/');
+  const fileName = parts[parts.length - 1];
+  
+  // If it's a complex name with encoded characters, extract just the ID portion
+  if (fileName.includes('%')) {
+    const matches = fileName.match(/[a-f0-9]{32}\.[a-zA-Z0-9]+$/i);
+    if (matches) {
+      return matches[0];
+    }
+  }
+  
+  return fileName;
+}
+
+export function formatDisplayPath(path: string): string {
+  if (!path) return '';
+  // Convert complex paths to a simpler format
+  const matches = path.match(/Android\/media\/com\.whatsapp\/WhatsApp\/Media\/\.Statuses\/[^\/]+$/);
+  if (matches) {
+    return matches[0];
+  }
+  return path;
 } 

@@ -1,6 +1,6 @@
 import { AndroidDirectory } from '@/lib/androidDirectories';
 
-export type SortOption = 'date-desc' | 'date-asc' | 'type-asc' | 'type-desc' | 'name-asc' | 'name-desc';
+export type SortOption = 'date-desc' | 'date-asc' | 'type-asc' | 'type-desc' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc';
 
 export interface FileItem {
   name: string;
@@ -11,6 +11,7 @@ export interface FileItem {
   categoryId: string;
   modifiedTime: number;
   displayName?: string;
+  displayPath?: string;
 }
 
 export interface Category {

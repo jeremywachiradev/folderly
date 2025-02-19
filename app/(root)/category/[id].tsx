@@ -1,96 +1,352 @@
-import React, { useState, useEffect } from 'react';
-import {  View } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Alert, ScrollView, Animated } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Category, getCategories, deleteCategory } from '@/lib/categoryManager';
-import { Header, Loading, EmptyState } from '@/components/ui';
-import CategoryView from '@/components/CategoryView';
+import { Ionicons } from '@expo/vector-icons';
+import { FileItem, Category, SortOption } from '@/types';
+import { useCategories } from '@/lib/category-provider';
+import { useTheme } from '@/lib/theme-provider';
+import { Text } from '@/components/ui';
+import { deleteCategory } from '@/lib/categoryManager';
+import { listFiles } from '@/lib/fileManager';
+import { FileList } from '@/components/FileList/index';
+import { SortModal } from '@/components/SortModal';
+import { showDialog, showToast } from '@/lib/notifications';
 
-export default function CategoryPage() {
-  const { id } = useLocalSearchParams();
-  const [category, setCategory] = useState<Category | null>(null);
-  const [loading, setLoading] = useState(true);
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const ITEM_SIZE = SCREEN_WIDTH / 2;
+
+export default function CategoryScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const { isDarkMode } = useTheme();
+  const { categories, loadCategories } = useCategories();
+  const [category, setCategory] = useState<Category | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = 200;
+
+  // Initialize animated value
+  useEffect(() => {
+    scrollY.setValue(0);
+  }, []);
 
   useEffect(() => {
-    if (typeof id === 'string') {
-      loadCategory(id);
-    } else {
+    if (!id) return;
+    
+    const category = categories.find(c => c.id === id);
+    if (!category) {
+      showToast('error', 'Category not found');
       router.back();
+      return;
     }
-  }, [id]);
+    
+    setCategory(category);
+    loadFiles(category, 1, true);
+  }, [id, categories]);
 
-  const loadCategory = async (categoryId: string) => {
+  const loadFiles = async (cat: Category, pageNum: number = 1, reset: boolean = false) => {
     try {
-      setLoading(true);
-      const categories = await getCategories();
-      const found = categories.find(cat => cat.id === categoryId);
-      
-      if (!found) {
-        router.back();
-        return;
+      if (pageNum === 1) {
+        setIsLoadingFiles(true);
+      } else {
+        setIsLoadingMore(true);
       }
 
-      setCategory(found);
+      const { files: newFiles, hasMore: more } = await listFiles(cat.directories, pageNum, sortOption);
+      
+      setFiles(prev => {
+        if (reset || pageNum === 1) return newFiles;
+        return [...prev, ...newFiles];
+      });
+      setHasMore(more);
+      setPage(pageNum);
     } catch (error) {
-      router.back();
+      showToast('error', 'Failed to load files');
     } finally {
-      setLoading(false);
+      setIsLoadingFiles(false);
+      setIsLoadingMore(false);
     }
   };
 
   const handleEdit = () => {
-    if (category) {
-      router.push(`/category/${category.id}/edit` as any);
-    }
+    if (!category) return;
+    router.push({
+      pathname: '/category/new',
+      params: { 
+        id: category.id,
+        mode: 'edit',
+        title: 'Edit Category'
+      }
+    });
   };
 
-  const handleDelete = async () => {
+  const handleDeleteCategory = async () => {
     if (!category) return;
 
-    try {
-      await deleteCategory(category.id);
-      router.back();
-    } catch (error) {
-      // Error is handled by the deleteCategory function
-    }
+    const result = await showDialog({
+      title: 'Delete Category',
+      message: `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCategory(category.id);
+              router.back();
+            } catch (error) {
+              showToast('error', 'Failed to delete category');
+            }
+          }
+        }
+      ]
+    });
   };
 
-  if (loading) {
-    return <Loading fullScreen text="Loading category..." />;
-  }
+  const handleLoadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore && category) {
+      loadFiles(category, page + 1);
+    }
+  }, [isLoadingMore, hasMore, category, page]);
 
-  if (!category) {
-    return (
-      <EmptyState
-        icon="alert-circle"
-        title="Category Not Found"
-        description="The category you're looking for doesn't exist."
-        action={{
-          label: "Go Back",
-          icon: "arrow-back",
-          onPress: () => router.back(),
-        }}
-      />
-    );
-  }
+  const handleRefresh = useCallback(() => {
+    if (category) {
+      loadFiles(category, 1, true);
+    }
+  }, [category]);
+
+  const handleSortChange = useCallback((newSort: SortOption) => {
+    setSortOption(newSort);
+    if (category) {
+      loadFiles(category, 1, true);
+    }
+  }, [category]);
+
+  // Update header animations with native driver
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, headerHeight],
+    outputRange: [0, -headerHeight + 64],
+    extrapolate: 'clamp'
+  });
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [headerHeight - 100, headerHeight],
+    outputRange: [1, 0],
+    extrapolate: 'clamp'
+  });
+
+  const minimizedHeaderOpacity = scrollY.interpolate({
+    inputRange: [headerHeight - 100, headerHeight],
+    outputRange: [0, 1],
+    extrapolate: 'clamp'
+  });
+
+  const contentTranslateY = scrollY.interpolate({
+    inputRange: [0, headerHeight],
+    outputRange: [0, -headerHeight + 64],
+    extrapolate: 'clamp'
+  });
+
+  if (!category) return null;
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
-      <Header
-        title={category.name}
-        showBack
-        action={{
-          icon: "ellipsis-horizontal",
-          onPress: handleEdit,
-          label: "Options",
+      <Stack.Screen
+        options={{
+          headerShown: false
         }}
       />
-      <CategoryView
-        category={category}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+
+      {/* Minimized Header - Shows when scrolled */}
+      <Animated.View 
+        className="absolute top-0 left-0 right-0 z-10 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800"
+        style={[{
+          height: 64,
+          zIndex: 2
+        }, {
+          transform: [{ translateY: headerTranslateY }],
+          opacity: minimizedHeaderOpacity
+        }]}
+      >
+        <View className="flex-row items-center justify-between px-4 h-full">
+          <View className="flex-row items-center flex-1">
+            <TouchableOpacity 
+              onPress={() => router.back()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons 
+                name="chevron-back" 
+                size={28} 
+                color={isDarkMode ? '#ffffff' : '#000000'} 
+              />
+            </TouchableOpacity>
+            <Text
+              variant="h3"
+              weight="semibold"
+              className="text-neutral-900 dark:text-white ml-3 flex-1"
+              numberOfLines={1}
+            >
+              {category?.name}
+            </Text>
+          </View>
+          <View className="flex-row gap-4">
+            <TouchableOpacity onPress={handleEdit}>
+              <Ionicons 
+                name="pencil" 
+                size={24} 
+                color={isDarkMode ? '#ffffff' : '#000000'} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDeleteCategory}>
+              <Ionicons 
+                name="trash-outline" 
+                size={24} 
+                color={isDarkMode ? '#ffffff' : '#000000'} 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+
+      <Animated.View 
+        className="flex-1"
+        style={{
+          transform: [{ translateY: contentTranslateY }]
+        }}
+      >
+        {/* Full Header - Animates out when scrolled */}
+        <Animated.View 
+          className="border-b border-neutral-200 dark:border-neutral-800"
+          style={{
+            opacity: headerOpacity,
+            transform: [{ translateY: headerTranslateY }]
+          }}
+        >
+          <View className="p-4">
+            <View className="flex-row items-center justify-between mb-4">
+              <TouchableOpacity 
+                onPress={() => router.back()}
+                className="p-2 -ml-2"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons 
+                  name="chevron-back" 
+                  size={28} 
+                  color={isDarkMode ? '#ffffff' : '#000000'} 
+                />
+              </TouchableOpacity>
+              <View className="flex-row gap-4">
+                <TouchableOpacity 
+                  onPress={handleEdit}
+                  className="p-2"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons 
+                    name="pencil" 
+                    size={24} 
+                    color={isDarkMode ? '#ffffff' : '#000000'} 
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={handleDeleteCategory}
+                  className="p-2"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons 
+                    name="trash-outline" 
+                    size={24} 
+                    color={isDarkMode ? '#ffffff' : '#000000'} 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View className="flex-row items-center">
+              <View
+                className="w-12 h-12 rounded-lg items-center justify-center"
+                style={{ backgroundColor: `${category?.color}15` }}
+              >
+                <Ionicons name="folder" size={24} color={category?.color} />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text
+                  variant="h4"
+                  weight="semibold"
+                  className="text-neutral-900 dark:text-white"
+                >
+                  {category?.name}
+                </Text>
+                <Text
+                  variant="body"
+                  className="text-neutral-600 dark:text-neutral-400"
+                >
+                  {category?.directories.length} {category?.directories.length === 1 ? 'folder' : 'folders'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Directory List */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4">
+              {category?.directories.map((dir) => (
+                <View
+                  key={dir.path}
+                  className="flex-row items-center py-2 px-4 mr-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg"
+                >
+                  <Ionicons
+                    name="folder-outline"
+                    size={20}
+                    color={category.color}
+                  />
+                  <Text
+                    variant="body"
+                    className="ml-2 text-neutral-600 dark:text-neutral-400"
+                  >
+                    {dir.name}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </Animated.View>
+
+        {/* Files Section */}
+        <View style={{ flex: 1 }}>
+          <FileList
+            files={files}
+            isLoading={isLoadingFiles}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            onLoadMore={handleLoadMore}
+            onRefresh={handleRefresh}
+            sortOption={sortOption}
+            onSortChange={handleSortChange}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            showSortModal={showSortModal}
+            onSortModalChange={setShowSortModal}
+          />
+        </View>
+
+        {/* Sort Modal */}
+        <SortModal
+          visible={showSortModal}
+          onClose={() => setShowSortModal(false)}
+          currentSort={sortOption}
+          onSortChange={handleSortChange}
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 } 

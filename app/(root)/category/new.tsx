@@ -6,6 +6,7 @@ import CategoryForm from '@/components/CategoryForm';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCategory } from '@/lib/categoryManager';
 import { Category } from '@/types';
+import { showToast } from '@/lib/notifications';
 
 export default function CategoryScreen() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function CategoryScreen() {
   const params = useLocalSearchParams();
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const isEditing = params.mode === 'edit';
   const title = isEditing ? 'Edit Category' : 'New Category';
@@ -22,6 +24,27 @@ export default function CategoryScreen() {
       loadCategory(params.id as string);
     }
   }, [params.id, isEditing]);
+
+  useEffect(() => {
+    if (params.id && params.mode === 'edit') {
+      const category = categories.find(c => c.id === params.id);
+      if (!category) {
+        showToast('error', 'Category not found');
+        router.back();
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setCategory(category);
+      } catch (error) {
+        showToast('error', 'Failed to load category');
+        router.back();
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [params.id, params.mode, categories]);
 
   const loadCategory = async (id: string) => {
     try {

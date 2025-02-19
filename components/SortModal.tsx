@@ -18,6 +18,8 @@ const sortOptions: { value: SortOption; label: string; icon: string }[] = [
   { value: 'name-desc', label: 'Name (Z to A)', icon: 'text-outline' },
   { value: 'type-asc', label: 'Type (A to Z)', icon: 'documents-outline' },
   { value: 'type-desc', label: 'Type (Z to A)', icon: 'documents-outline' },
+  { value: 'size-desc', label: 'Size (Largest First)', icon: 'archive-outline' },
+  { value: 'size-asc', label: 'Size (Smallest First)', icon: 'archive-outline' },
 ];
 
 export function SortModal({ visible, onClose, currentSort, onSortChange }: SortModalProps) {

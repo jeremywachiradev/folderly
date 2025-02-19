@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform
 } from 'react-native';
@@ -16,6 +15,7 @@ import { AndroidDirectory, hasStoragePermissions, requestAndroidPermissions, ope
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/lib/theme-provider';
 import { StorageAccessFramework } from 'expo-file-system';
+import { showDialog, showToast } from '@/lib/notifications';
 
 interface CategoryFormProps {
   category?: Category;
@@ -137,12 +137,12 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a category name');
+      showToast('error', 'Please enter a category name');
       return;
     }
 
     if (directories.length === 0) {
-      Alert.alert('Error', 'Please select at least one directory');
+      showToast('error', 'Please select at least one directory');
       return;
     }
 
@@ -159,7 +159,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
       }
       router.back();
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to save category');
+      showToast('error', error instanceof Error ? error.message : 'Failed to save category');
     } finally {
       setIsSaving(false);
     }
@@ -169,11 +169,11 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
     if (Platform.OS === 'android' && !hasPermission) {
       const granted = await requestPermissions();
       if (!granted) {
-        Alert.alert(
-          'Storage Permission Required',
-          'This app needs storage access permission to select directories. Would you like to grant permission in settings?',
-          [
-            { text: 'Cancel', style: 'cancel' },
+        const result = await showDialog({
+          title: 'Storage Permission Required',
+          message: 'This app needs storage access permission to select directories. Would you like to grant permission in settings?',
+          buttons: [
+            { text: 'Cancel', style: 'cancel', onPress: () => {} },
             { 
               text: 'Open Settings',
               onPress: async () => {
@@ -181,7 +181,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
               }
             }
           ]
-        );
+        });
         return;
       }
     }

@@ -6,6 +6,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { useFileSystem } from '@/lib/hooks/useFileSystem';
 import { Header, Loading } from '@/components/ui';
+import { showToast } from '@/lib/notifications';
 
 interface UploadingFile {
   uri: string;
@@ -42,8 +43,8 @@ export default function UploadScreen() {
 
       setUploadingFiles(prev => [...prev, ...newFiles]);
       startUploads(newFiles);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to select files');
+    } catch (error) {
+      showToast('error', 'Failed to select files');
     }
   };
 
@@ -54,8 +55,8 @@ export default function UploadScreen() {
       await Promise.all(files.map(file => uploadFile(file)));
       await refresh();
       router.back();
-    } catch (err) {
-      Alert.alert('Error', 'Some files failed to upload');
+    } catch (error) {
+      showToast('error', 'Some files failed to upload');
     } finally {
       setIsUploading(false);
     }

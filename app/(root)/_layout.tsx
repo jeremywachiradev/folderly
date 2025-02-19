@@ -1,53 +1,40 @@
-import { Redirect, Stack } from "expo-router";
-import { ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth-provider";
-import React from 'react';
+import { Stack } from 'expo-router';
 import { useTheme } from '@/lib/theme-provider';
 
-export default function AppLayout() {
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
-  const { user, isLoading } = useAuth();
+export default function RootLayout() {
   const { isDarkMode } = useTheme();
-
-  useEffect(() => {
-    checkOnboarding();
-  }, []);
-
-  const checkOnboarding = async () => {
-    try {
-      const value = await AsyncStorage.getItem("hasSeenOnboarding");
-      setHasSeenOnboarding(value === "true");
-    } catch (e) {
-      console.log("Error reading from AsyncStorage:", e);
-      setHasSeenOnboarding(false);
-    }
-  };
-
-  if (hasSeenOnboarding === null || isLoading) {
-    return (
-      <SafeAreaView className="bg-neutral-900 h-full flex justify-center items-center">
-        <ActivityIndicator color="#0077ff" size="large" />
-      </SafeAreaView>
-    );
-  }
-
-  if (!hasSeenOnboarding) {
-    return <Redirect href="/onboarding" />;
-  }
-
-  if (!user) {
-    return <Redirect href="/sign-in" />;
-  }
-
+  
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: {
+          backgroundColor: isDarkMode ? '#171717' : '#ffffff'
+        }
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="directory-picker" />
+      <Stack.Screen name="upload" />
       <Stack.Screen name="category/[id]" />
       <Stack.Screen name="category/new" />
-      <Stack.Screen name="directory-picker" />
+      <Stack.Screen name="properties/[id]" />
+      <Stack.Screen
+        name="file/[id]"
+        options={{
+          headerShown: true,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          contentStyle: {
+            backgroundColor: isDarkMode ? '#171717' : '#ffffff'
+          },
+          gestureEnabled: true,
+          gestureDirection: 'vertical',
+          fullScreenGestureEnabled: true
+        }}
+      />
     </Stack>
   );
 }

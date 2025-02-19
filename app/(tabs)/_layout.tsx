@@ -11,8 +11,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#0077ff',
         tabBarInactiveTintColor: isDarkMode ? '#a3a3a3' : '#737373',
         tabBarStyle: {
-          backgroundColor: isDarkMode ? '#171717' : '#ffffff',
-          borderTopColor: isDarkMode ? '#262626' : '#e5e5e5',
+          backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+          borderTopColor: isDarkMode ? '#1e293b' : '#e5e5e5',
         },
         headerShown: false,
       }}

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Alert } from 'react-native';
 import { StorageAccessFramework } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hasStoragePermissions, requestAndroidPermissions } from '@/lib/androidDirectories';
 import { AndroidDirectory } from '@/lib/androidDirectories';
+import { showDialog, showToast } from '@/lib/notifications';
 
 interface DirectoryPickerProps {
   mode?: 'single' | 'multiple';
@@ -34,15 +34,31 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
     }
   };
 
+  const checkPermissions = async () => {
+    if (!hasStoragePermissions()) {
+      await showDialog({
+        title: 'Permission Required',
+        message: 'Storage access permission is required to select directories.',
+        buttons: [
+          {
+            text: 'OK',
+            onPress: () => {},
+          }
+        ]
+      });
+      return false;
+    }
+    return true;
+  };
+
   const pickDirectory = async () => {
     try {
       // Check if we already have root permissions
-      const hasPermission = await hasStoragePermissions();
+      const hasPermission = await checkPermissions();
       if (!hasPermission) {
         // Request root permissions first time
         const { granted } = await requestAndroidPermissions();
         if (!granted) {
-          Alert.alert('Permission Required', 'Storage access permission is required to select directories.');
           onClose();
           return;
         }
@@ -56,7 +72,13 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
         
         try {
           // Verify we can read the directory by attempting to list its contents
-          await StorageAccessFramework.readDirectoryAsync(uri);
+          const directory = await StorageAccessFramework.readDirectoryAsync(uri);
+          
+          if (!directory) {
+            showToast('error', 'Could not access the selected directory. Please try again.');
+            onClose();
+            return;
+          }
           
           // Get the directory name from the URI
           const dirName = decodeURIComponent(uri.split('/').pop() || 'Selected Directory')
@@ -94,7 +116,7 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
           }
         } catch (error) {
           console.error('Error verifying directory access:', error);
-          Alert.alert('Error', 'Could not access the selected directory. Please try again.');
+          showToast('error', 'Could not access the selected directory. Please try again.');
           onClose();
           return;
         }
@@ -103,7 +125,7 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
       onClose();
     } catch (error) {
       console.error('Error picking directory:', error);
-      Alert.alert('Error', 'Failed to select directory. Please try again.');
+      showToast('error', 'Failed to select directory. Please try again.');
       onClose();
     }
   };

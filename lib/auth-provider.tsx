@@ -1,20 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Account, Client, ID, type OAuthProvider } from 'appwrite';
+import { ID, type Models } from 'appwrite';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
-
-const client = new Client()
-  .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!)
-  .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!);
-
-const account = new Account(client);
+import { account, avatars } from './appwrite';
 
 interface User {
-  email: string;
   id: string;
+  email: string;
   name?: string;
+  avatar?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface AuthContextType {
@@ -52,27 +51,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSession = async () => {
     try {
       setIsLoading(true);
-      // Clear any existing guest mode on app start
       await AsyncStorage.removeItem('guestMode');
       
       try {
         const session = await account.get();
+        
+        // Check if session is valid
+        try {
+          await account.getSession('current');
+        } catch (sessionError) {
+          console.log('Session expired, cleaning up...');
+          await signOut();
+          return;
+        }
+
+        const userAvatar = session.name ? avatars.getInitials(session.name) : undefined;
+        
         setUser({
-          email: session.email,
           id: session.$id,
+          email: session.email,
           name: session.name,
+          avatar: userAvatar?.toString(),
+          createdAt: session.$createdAt,
+          updatedAt: session.$updatedAt,
         });
         setIsGuest(false);
       } catch (sessionError) {
-        setIsGuest(false);
-        setUser(null);
+        console.log('No active session found:', sessionError);
+        await cleanupUserData();
       }
     } catch (error) {
       console.log('Error checking session:', error);
-      setIsGuest(false);
-      setUser(null);
+      await cleanupUserData();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Helper function to clean up user data
+  const cleanupUserData = async () => {
+    try {
+      setIsGuest(false);
+      setUser(null);
+      await AsyncStorage.removeItem('guestMode');
+      await AsyncStorage.multiRemove([
+        'user_preferences',
+        'last_session',
+        'auth_state'
+      ]);
+    } catch (error) {
+      console.error('Error cleaning up user data:', error);
     }
   };
 
@@ -80,10 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await account.createSession(email, password);
       const session = await account.get();
+      const userAvatar = session.name ? avatars.getInitials(session.name) : undefined;
+
       setUser({
-        email: session.email,
         id: session.$id,
+        email: session.email,
         name: session.name,
+        avatar: userAvatar?.toString(),
+        createdAt: session.$createdAt,
+        updatedAt: session.$updatedAt,
       });
     } catch (error) {
       console.error('Error signing in:', error);
@@ -95,58 +128,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Starting Google sign-in process...');
       
-      // Different callback URLs for different platforms
-      const successUrl = Platform.select({
-        ios: 'folderly://callback',
-        android: 'folderly://callback',
-        default: 'folderly://callback',
-      });
+      // Clean up any existing sessions before starting new auth
+      await cleanupUserData();
+      
+      const redirectUri = Linking.createURL("/");
+      
+      const response = await account.createOAuth2Token(
+        'google' as any,
+        redirectUri,
+        redirectUri
+      );
+      
+      if (!response) throw new Error("Create OAuth2 token failed");
 
-      const failureUrl = Platform.select({
-        ios: 'folderly://failure',
-        android: 'folderly://failure',
-        default: 'folderly://failure',
-      });
-
-      console.log('Creating OAuth session with URLs:', { successUrl, failureUrl });
-
-      // Get the OAuth URL from Appwrite
-      const oauthUrl = `${process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT}/account/sessions/oauth2/google?` +
-        new URLSearchParams({
-          project: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
-          success: successUrl!,
-          failure: failureUrl!
-        }).toString();
-
-      console.log('Opening OAuth URL:', oauthUrl);
-
-      // Open the OAuth URL in the browser
-      const result = await WebBrowser.openAuthSessionAsync(
-        oauthUrl,
-        successUrl!
+      const browserResult = await WebBrowser.openAuthSessionAsync(
+        response.toString(),
+        redirectUri,
+        {
+          showInRecents: false,
+          preferEphemeralSession: true
+        }
       );
 
-      console.log('Auth session result:', result);
-
-      if (result.type === 'success') {
-        // The user has been redirected back to the app
-        // The session will be automatically created by Appwrite
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const session = await account.get();
-        setUser({
-          email: session.email,
-          id: session.$id,
-          name: session.name,
-        });
-      } else {
-        throw new Error('Authentication was cancelled');
+      if (browserResult.type !== "success") {
+        throw new Error("Authentication was cancelled");
       }
+
+      const url = new URL(browserResult.url);
+      const secret = url.searchParams.get("secret")?.toString();
+      const userId = url.searchParams.get("userId")?.toString();
+      
+      if (!secret || !userId) {
+        throw new Error("Missing authentication parameters");
+      }
+
+      // Create session with rate limiting
+      let retries = 0;
+      const maxRetries = 3;
+      let session;
+
+      while (retries < maxRetries) {
+        try {
+          session = await account.createSession(userId, secret);
+          break;
+        } catch (error) {
+          retries++;
+          if (retries === maxRetries) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        }
+      }
+
+      if (!session) throw new Error("Failed to create session");
+
+      // Get user details after successful session creation
+      const userSession = await account.get();
+      
+      // Verify email is present and verified
+      if (!userSession.email) {
+        await signOut();
+        throw new Error("Email is required for authentication");
+      }
+
+      const userAvatar = userSession.name ? avatars.getInitials(userSession.name) : undefined;
+
+      setUser({
+        id: userSession.$id,
+        email: userSession.email,
+        name: userSession.name,
+        avatar: userAvatar?.toString(),
+        createdAt: userSession.$createdAt,
+        updatedAt: userSession.$updatedAt,
+      });
+
+      // Store last successful auth timestamp
+      await AsyncStorage.setItem('last_successful_auth', Date.now().toString());
+      
     } catch (error) {
       console.error('Error in signInWithGoogle:', error);
       if (error instanceof Error) {
         console.error('Error details:', error.message);
       }
-      throw new Error('Failed to start Google sign-in. Please try again.');
+      await cleanupUserData();
+      throw new Error('Failed to complete Google sign-in. Please try again.');
     }
   };
 
@@ -154,7 +217,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Handling OAuth callback with response:', response);
       
-      // Wait a bit to ensure the session is properly created
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const session = await account.get();
@@ -167,10 +229,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         originalUserId: session.$id,
       });
 
+      const userAvatar = session.name ? avatars.getInitials(session.name) : undefined;
+
       setUser({
-        email: session.email,
         id: compatibleUserId,
+        email: session.email,
         name: session.name,
+        avatar: userAvatar?.toString(),
+        createdAt: session.$createdAt,
+        updatedAt: session.$updatedAt,
       });
       
       console.log('Successfully set user in state');
@@ -186,26 +253,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setGuestMode = async () => {
     try {
       setIsLoading(true);
-      // Generate a temporary guest ID
+      
+      // Clean up any existing session first
+      await cleanupUserData();
+      
+      // Create a temporary guest user
       const guestId = `guest_${Date.now()}`;
-      
-      // First clear any existing state
-      await AsyncStorage.removeItem('guestMode');
-      setUser(null);
-      
-      // Then set the new guest state
-      await AsyncStorage.setItem('guestMode', guestId);
-      setIsGuest(true);
-      
-      // Set a minimal user object for guest mode
-      setUser({
+      const guestUser = {
         id: guestId,
-        email: 'guest@local',
-        name: 'Guest User'
+        email: 'guest@folderly.app',
+        name: 'Guest User',
+      };
+
+      // Set guest mode in storage first
+      await AsyncStorage.setItem('guestMode', 'true');
+
+      // Update states with a small delay to ensure proper order
+      await new Promise<void>(resolve => {
+        setTimeout(() => {
+          setUser(guestUser);
+          setIsGuest(true);
+          resolve();
+        }, 100);
       });
+      
+      console.log('Guest mode setup completed');
     } catch (error) {
       console.error('Error setting guest mode:', error);
-      // Reset state on error
+      // Reset states on error
       setIsGuest(false);
       setUser(null);
       await AsyncStorage.removeItem('guestMode');
@@ -218,14 +293,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setIsLoading(true);
-      await AsyncStorage.removeItem('guestMode');
-      setIsGuest(false);
+      
+      // Delete all sessions instead of just current
       try {
-        await account.deleteSession('current');
+        const sessions = await account.listSessions();
+        await Promise.all(
+          sessions.sessions.map(session => 
+            account.deleteSession(session.$id)
+          )
+        );
       } catch (e) {
-        // Ignore error if no session exists
+        console.log('No sessions to delete');
       }
-      setUser(null);
+
+      await cleanupUserData();
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;

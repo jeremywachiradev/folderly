@@ -33,6 +33,11 @@ const getFileType = (fileName: string): FileType => {
   return 'other';
 };
 
+type FileInfoResult = FileSystem.FileInfo & {
+  modificationTime?: number;
+  size?: number;
+};
+
 // Get all files from a directory
 export const getFilesFromDirectory = async (directory: string): Promise<FileItem[]> => {
   try {
@@ -54,29 +59,33 @@ export const getFilesFromDirectory = async (directory: string): Promise<FileItem
       const fileItems = await Promise.all(
         files.map(async (uri) => {
           try {
-            // Get the file name from the URI
+            // Get the file info using FileSystem
+            const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+            if (!fileInfo.exists) {
+              return null;
+            }
+
             const fileName = decodeURIComponent(uri.split('/').pop() || '').replace(/^[^:]+:/, '');
             const type = getFileType(fileName);
 
-            // Try to get basic file info
-            let isDirectory = false;
-            try {
-              // Try to read as directory to check if it's a directory
-              await StorageAccessFramework.readDirectoryAsync(uri);
-              isDirectory = true;
-            } catch {
-              // If reading as directory fails, it's a file
-              isDirectory = false;
-            }
+            // Create a proper content URI that can be used by other apps
+            const contentUri = Platform.select({
+              android: uri,
+              ios: uri,
+              default: uri
+            });
 
+            // Get file stats for additional info
+            const stats = await FileSystem.getInfoAsync(uri, { size: true }) as FileInfoResult;
+            
             return {
               name: fileName,
               path: uri,
-              uri: uri,
-              size: 0, // Size information not available through SAF
-              modificationTime: Date.now(),
-              type: isDirectory ? 'other' : type,
-              isDirectory
+              uri: contentUri,
+              size: stats.exists ? (stats as any).size || 0 : 0,
+              modificationTime: stats.modificationTime || Date.now(), // Use actual last modified time if available
+              type: fileInfo.isDirectory ? 'other' : type,
+              isDirectory: fileInfo.isDirectory
             };
           } catch (error) {
             console.error('Error processing file:', error);
@@ -140,24 +149,31 @@ export const getFileStats = async (uri: string) => {
       if (!granted) return null;
     }
 
-    // Try to determine if it's a directory
+    // Try to determine if it's a directory and get metadata
     try {
-      await StorageAccessFramework.readDirectoryAsync(uri);
-      return {
-        exists: true,
-        uri,
-        size: 0,
-        modificationTime: Date.now(),
-        isDirectory: true
-      };
-    } catch {
-      return {
-        exists: true,
-        uri,
-        size: 0,
-        modificationTime: Date.now(),
-        isDirectory: false
-      };
+      try {
+        await StorageAccessFramework.readDirectoryAsync(uri);
+        const stats = await FileSystem.getInfoAsync(uri, { size: true }) as FileInfoResult;
+        return {
+          exists: true,
+          uri,
+          size: 0,
+          modificationTime: stats.modificationTime || Date.now(),
+          isDirectory: true
+        };
+      } catch {
+        const stats = await FileSystem.getInfoAsync(uri, { size: true }) as FileInfoResult;
+        return {
+          exists: true,
+          uri,
+          size: stats.size || 0,
+          modificationTime: stats.modificationTime || Date.now(),
+          isDirectory: false
+        };
+      }
+    } catch (error) {
+      console.error('Error getting file stats:', error);
+      return null;
     }
   } catch (error) {
     console.error('Error getting file stats:', error);
@@ -192,27 +208,24 @@ export const saveFile = async (sourceUri: string, fileName: string): Promise<voi
       throw new Error('No save directory set');
     }
 
-    // Ensure we have storage permissions
-    const hasPermission = await hasStoragePermissions();
-    if (!hasPermission) {
-      const { granted } = await requestAndroidPermissions();
-      if (!granted) {
-        throw new Error('Storage permission not granted');
-      }
-    }
+    // Read the source file content
+    const content = await StorageAccessFramework.readAsStringAsync(sourceUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
 
-    // Create destination URI
+    // Create the file in the destination directory
     const destinationUri = await StorageAccessFramework.createFileAsync(
       saveDir,
       fileName,
       'application/octet-stream'
     );
 
-    // Copy the file
-    await FileSystem.copyAsync({
-      from: sourceUri,
-      to: destinationUri
-    });
+    // Write the content to the new file
+    await StorageAccessFramework.writeAsStringAsync(
+      destinationUri,
+      content,
+      { encoding: FileSystem.EncodingType.Base64 }
+    );
   } catch (error) {
     console.error('Error saving file:', error);
     throw error;
@@ -226,32 +239,49 @@ export const saveFiles = async (files: { uri: string; name: string }[]): Promise
       throw new Error('No save directory set');
     }
 
-    // Ensure we have storage permissions
-    const hasPermission = await hasStoragePermissions();
-    if (!hasPermission) {
-      const { granted } = await requestAndroidPermissions();
-      if (!granted) {
-        throw new Error('Storage permission not granted');
-      }
-    }
-
     // Save all files
     await Promise.all(
       files.map(async ({ uri, name }) => {
+        // Read the source file content
+        const content = await StorageAccessFramework.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Create the file in the destination directory
         const destinationUri = await StorageAccessFramework.createFileAsync(
           saveDir,
           name,
           'application/octet-stream'
         );
 
-        await FileSystem.copyAsync({
-          from: uri,
-          to: destinationUri
-        });
+        // Write the content to the new file
+        await StorageAccessFramework.writeAsStringAsync(
+          destinationUri,
+          content,
+          { encoding: FileSystem.EncodingType.Base64 }
+        );
       })
     );
   } catch (error) {
     console.error('Error saving files:', error);
+    throw error;
+  }
+};
+
+// Add a new function to get a proper content URI for a file
+export const getContentUri = async (uri: string): Promise<string> => {
+  try {
+    if (Platform.OS === 'android') {
+      // On Android, we need to get a content:// URI that can be used by other apps
+      const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (permissions.granted) {
+        return uri;
+      }
+      throw new Error('Storage permission not granted');
+    }
+    return uri;
+  } catch (error) {
+    console.error('Error getting content URI:', error);
     throw error;
   }
 }; 

@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Text } from '@/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -20,21 +21,88 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-900">
       <View className="flex-1 justify-center items-center p-8">
-        <View className="w-64 h-64 mb-8 bg-white/10 rounded-3xl items-center justify-center">
-          <Image
-            source={require("@/assets/images/onboarding.png")}
-            className="w-56 h-56"
-            resizeMode="contain"
+        <View className="relative w-[420px] h-[420px] mb-8">
+          {/* Top gradient */}
+          <LinearGradient
+            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            locations={[0, 0.2, 0.5, 0.8, 1]}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              borderRadius: 24,
+              zIndex: 1
+            }}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
           />
+          {/* Left gradient */}
+          <LinearGradient
+            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            locations={[0, 0.2, 0.5, 0.8, 1]}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              borderRadius: 24,
+              zIndex: 1
+            }}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+          />
+          {/* Right gradient */}
+          <LinearGradient
+            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            locations={[0, 0.2, 0.5, 0.8, 1]}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              borderRadius: 24,
+              zIndex: 1
+            }}
+            start={{ x: 1, y: 0.5 }}
+            end={{ x: 0, y: 0.5 }}
+          />
+          {/* Bottom gradient */}
+          <LinearGradient
+            colors={['transparent', 'transparent', 'transparent', 'rgba(15, 23, 42, 0.2)', 'rgb(15, 23, 42)']}
+            locations={[0, 0.2, 0.5, 0.8, 1]}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              borderRadius: 24,
+              zIndex: 1
+            }}
+            start={{ x: 0.5, y: 1 }}
+            end={{ x: 0.5, y: 0 }}
+          />
+          <View className="w-full h-full items-center justify-center overflow-hidden rounded-3xl">
+            <Image
+              source={require("@/assets/images/onboarding.png")}
+              className="w-[98%] h-[98%]"
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
         <Text
           variant="h1"
           weight="bold"
-          className="text-center mb-4 text-white"
+          className="text-center mb-4 text-white flex-row items-center justify-center"
         >
-          Welcome to Folderly
+          Welcome to{' '}<Text variant="h1" weight="bold" className="text-[#0077ff]">Folderly</Text>
         </Text>
+        
 
         <Text
           variant="body"

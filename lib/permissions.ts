@@ -1,6 +1,7 @@
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import { showDialog, showToast } from './notifications';
 
 interface PermissionRequest {
   title: string;
@@ -33,56 +34,61 @@ export const requestPermissionWithContext = async (
 
   const { title, message } = PERMISSION_MESSAGES[permissionType];
   
-  pendingPermissionRequest = new Promise((resolve) => {
-    Alert.alert(
-      title,
-      message,
-      [
-        {
-          text: 'Not Now',
-          style: 'cancel',
-          onPress: () => {
-            Alert.alert('Permission denied', 'Some features may be limited.');
-            pendingPermissionRequest = null;
-            resolve(false);
-          },
-        },
-        {
-          text: 'Allow',
-          onPress: async () => {
-            try {
-              let granted = false;
-              
-              if (permissionType === 'storage') {
-                if (Platform.OS === 'android') {
-                  const response = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-                  granted = response.granted;
-                } else {
-                  granted = true; // iOS doesn't need explicit storage permission
-                }
-              } else {
-                const { status } = await MediaLibrary.requestPermissionsAsync();
-                granted = status === 'granted';
-              }
-              
-              if (granted) {
-                Alert.alert('Success', 'Permission granted successfully!');
-              } else {
-                Alert.alert('Permission denied', 'Some features may be limited.');
-              }
-              
-              pendingPermissionRequest = null;
-              resolve(granted);
-            } catch (error) {
-              Alert.alert('Error', 'Something went wrong while requesting permissions.');
+  pendingPermissionRequest = new Promise(async (resolve) => {
+    try {
+      const result = await showDialog({
+        title,
+        message,
+        buttons: [
+          {
+            text: 'Not Now',
+            style: 'cancel',
+            onPress: () => {
+              showToast('error', 'Permission denied. Some features may be limited.');
               pendingPermissionRequest = null;
               resolve(false);
-            }
+            },
           },
-        },
-      ],
-      { cancelable: false }
-    );
+          {
+            text: 'Allow',
+            onPress: async () => {
+              try {
+                let granted = false;
+                
+                if (permissionType === 'storage') {
+                  if (Platform.OS === 'android') {
+                    const response = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                    granted = response.granted;
+                  } else {
+                    granted = true; // iOS doesn't need explicit storage permission
+                  }
+                } else {
+                  const { status } = await MediaLibrary.requestPermissionsAsync();
+                  granted = status === 'granted';
+                }
+                
+                if (granted) {
+                  showToast('success', 'Permission granted successfully!');
+                } else {
+                  showToast('error', 'Permission denied. Some features may be limited.');
+                }
+                
+                pendingPermissionRequest = null;
+                resolve(granted);
+              } catch (error) {
+                showToast('error', 'Something went wrong while requesting permissions.');
+                pendingPermissionRequest = null;
+                resolve(false);
+              }
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      showToast('error', 'Something went wrong while requesting permissions.');
+      pendingPermissionRequest = null;
+      resolve(false);
+    }
   });
 
   return pendingPermissionRequest;

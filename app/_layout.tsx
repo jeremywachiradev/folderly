@@ -8,6 +8,7 @@ import { CategoryProvider } from "@/lib/category-provider";
 import { SettingsProvider } from "@/lib/settings-provider";
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Toast from 'react-native-toast-message';
 import "./global.css";
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -24,13 +25,18 @@ function AppLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
+          animation: 'slide_from_right',
           contentStyle: {
             backgroundColor: 'transparent',
           },
         }}
       >
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(root)" options={{ headerShown: false }} />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack>
+      <Toast />
     </PaperProvider>
   );
 }

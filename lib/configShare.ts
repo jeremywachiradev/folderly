@@ -1,8 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Category } from './categoryManager';
+import { showDialog, showToast } from './notifications';
 
 interface FolderlyConfig {
   version: string;
@@ -166,10 +166,7 @@ export const exportConfig = async (
     }
   } catch (error) {
     console.error('Error exporting configuration:', error);
-    Alert.alert(
-      'Export Error',
-      error instanceof Error ? error.message : 'Failed to export configuration'
-    );
+    showToast('error', error instanceof Error ? error.message : 'Failed to export configuration');
   }
 };
 
@@ -220,12 +217,9 @@ export const importConfig = async (): Promise<FolderlyConfig | null> => {
     return null;
   } catch (error) {
     console.error('Error importing configuration:', error);
-    Alert.alert(
-      'Import Error',
-      error instanceof Error
-        ? error.message
-        : 'Failed to import configuration. Please make sure the file is a valid Folderly configuration.'
-    );
+    showToast('error', error instanceof Error
+      ? error.message
+      : 'Failed to import configuration. Please make sure the file is a valid Folderly configuration.');
     return null;
   }
 }; 
