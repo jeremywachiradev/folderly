@@ -6,6 +6,9 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { account, avatars } from './appwrite';
+import { initializeUserConfig, deleteUserCategories } from './config-sync';
+
+const CATEGORIES_STORAGE_KEY = '@folderly/categories';
 
 interface User {
   id: string;
@@ -94,10 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsGuest(false);
       setUser(null);
       await AsyncStorage.removeItem('guestMode');
+      
+      // Don't remove categories storage on logout, as we want to preserve cloud data
       await AsyncStorage.multiRemove([
         'user_preferences',
         'last_session',
-        'auth_state'
+        'auth_state',
+        'guest_categories' // Remove guest categories when logging out
       ]);
     } catch (error) {
       console.error('Error cleaning up user data:', error);
@@ -110,14 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const session = await account.get();
       const userAvatar = session.name ? avatars.getInitials(session.name) : undefined;
 
-      setUser({
+      const userData = {
         id: session.$id,
         email: session.email,
         name: session.name,
         avatar: userAvatar?.toString(),
         createdAt: session.$createdAt,
         updatedAt: session.$updatedAt,
-      });
+      };
+
+      // Initialize user config in Appwrite
+      await initializeUserConfig(userData.id);
+
+      setUser(userData);
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -191,14 +202,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const userAvatar = userSession.name ? avatars.getInitials(userSession.name) : undefined;
 
-      setUser({
+      const userData = {
         id: userSession.$id,
         email: userSession.email,
         name: userSession.name,
         avatar: userAvatar?.toString(),
         createdAt: userSession.$createdAt,
         updatedAt: userSession.$updatedAt,
-      });
+      };
+
+      // Initialize user config in Appwrite
+      await initializeUserConfig(userData.id);
+
+      setUser(userData);
 
       // Store last successful auth timestamp
       await AsyncStorage.setItem('last_successful_auth', Date.now().toString());
@@ -265,8 +281,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: 'Guest User',
       };
 
-      // Set guest mode in storage first
+      // Set guest mode in storage
       await AsyncStorage.setItem('guestMode', 'true');
+      
+      // Initialize guest categories from backup if exists
+      const guestCategories = await AsyncStorage.getItem('guest_categories');
+      if (guestCategories) {
+        await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, guestCategories);
+      } else {
+        await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, '[]');
+      }
 
       // Update states with a small delay to ensure proper order
       await new Promise<void>(resolve => {

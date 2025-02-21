@@ -13,6 +13,7 @@ import { FileList } from '@/components/FileList/index';
 import { SortModal } from '@/components/SortModal';
 import { showDialog, showToast } from '@/lib/notifications';
 import { Modal as PaperModal, Portal } from 'react-native-paper';
+import { useAuth } from '@/lib/auth-provider';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = SCREEN_WIDTH / 2;
@@ -22,6 +23,7 @@ export default function CategoryScreen() {
   const { id } = useLocalSearchParams();
   const { isDarkMode } = useTheme();
   const { categories, loadCategories } = useCategories();
+  const { user } = useAuth();
   const [category, setCategory] = useState<Category | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -91,10 +93,11 @@ export default function CategoryScreen() {
   };
 
   const handleDeleteCategory = async () => {
-    if (!category) return;
+    if (!category || !user) return;
 
     try {
-      await deleteCategory(category.id);
+      await deleteCategory(category.id, user.id);
+      await loadCategories();
       showToast('success', 'Category deleted successfully');
       router.back();
     } catch (error) {

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './auth-provider';
+import { showToast } from './notifications';
 
 interface Settings {
   theme: 'light' | 'dark' | 'system';
@@ -27,19 +29,25 @@ const SettingsContext = createContext<SettingsContextType | null>(null);
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const { user, isGuest } = useAuth();
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [user?.id]);
 
   const loadSettings = async () => {
     try {
+      setIsLoading(true);
+      
+      // Load from local storage
       const settingsJson = await AsyncStorage.getItem('settings');
       if (settingsJson) {
-        setSettings({ ...defaultSettings, ...JSON.parse(settingsJson) });
+        const localSettings = { ...defaultSettings, ...JSON.parse(settingsJson) };
+        setSettings(localSettings);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+      showToast('error', 'Failed to load settings');
     } finally {
       setIsLoading(false);
     }
@@ -47,6 +55,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const saveSettings = async (newSettings: Settings) => {
     try {
+      // Save to local storage
       await AsyncStorage.setItem('settings', JSON.stringify(newSettings));
     } catch (error) {
       console.error('Error saving settings:', error);

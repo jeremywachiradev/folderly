@@ -65,13 +65,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthProvider>
-          <CategoryProvider>
-            <SettingsProvider>
+          <SettingsProvider>
+            <CategoryProvider>
               <BottomSheetModalProvider>
                 <AppLayout />
               </BottomSheetModalProvider>
-            </SettingsProvider>
-          </CategoryProvider>
+            </CategoryProvider>
+          </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

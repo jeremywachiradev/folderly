@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AndroidDirectory } from './androidDirectories';
+import { saveCategories as saveCategoriesToCloud, deleteCategories } from './config-sync';
+import { showToast } from './notifications';
 
 export interface Category {
   id: string;
@@ -15,7 +17,8 @@ const CATEGORIES_STORAGE_KEY = '@folderly/categories';
 export const createCategory = async (
   name: string,
   color: string = '#007AFF',
-  directories: AndroidDirectory[] = []
+  directories: AndroidDirectory[] = [],
+  userId: string
 ): Promise<Category> => {
   try {
     const categories = await getCategories();
@@ -34,10 +37,16 @@ export const createCategory = async (
       updatedAt: Date.now()
     };
 
+    console.log('Creating category:', newCategory);
     await saveCategories([...categories, newCategory]);
+    console.log('Category saved locally, now synchronizing with Appwrite...');
+    await saveCategoriesToCloud(userId, [...categories, newCategory]);
+    console.log('Category synchronized with Appwrite successfully.');
+    showToast('success', 'Category created successfully!');
     return newCategory;
   } catch (error) {
     console.error('Error creating category:', error);
+    showToast('error', error instanceof Error ? error.message : 'Failed to create category');
     throw error;
   }
 };
@@ -89,13 +98,16 @@ export const updateCategory = async (
   }
 };
 
-export const deleteCategory = async (id: string): Promise<void> => {
+export const deleteCategory = async (id: string, userId: string): Promise<void> => {
   try {
     const categories = await getCategories();
     const filtered = categories.filter(cat => cat.id !== id);
     await saveCategories(filtered);
+    // Delete from Appwrite
+    await deleteCategories(userId, [id]);
   } catch (error) {
     console.error('Error deleting category:', error);
+    showToast('error', 'Failed to delete category');
     throw error;
   }
 };

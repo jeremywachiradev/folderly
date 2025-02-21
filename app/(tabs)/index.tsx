@@ -25,6 +25,7 @@ import { useFileStore } from '@/lib/file-store';
 import { FileList } from '@/components/FileList/index';
 import { showDialog, showToast } from '@/lib/notifications';
 import { Modal as PaperModal, Portal } from 'react-native-paper';
+import { useAuth } from '@/lib/auth-provider';
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -59,6 +60,7 @@ export default function HomeScreen() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isFileSelectionMode, setIsFileSelectionMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuth();
 
   // Initialize selected categories
   useEffect(() => {
@@ -247,14 +249,19 @@ export default function HomeScreen() {
   };
 
   const handleConfirmDelete = async () => {
+    if (!user) {
+      showToast('error', 'User is not logged in');
+      return;
+    }
+    
     try {
       for (const id of selectedModeCategories) {
-        await deleteCategory(id);
+        await deleteCategory(id, user.id);
       }
+      await loadCategories();
+      showToast('success', 'Categories deleted successfully');
       setIsSelectionMode(false);
       setSelectedModeCategories(new Set());
-      loadCategories();
-      showToast('success', 'Categories deleted successfully');
     } catch (error) {
       showToast('error', 'Failed to delete categories');
     } finally {

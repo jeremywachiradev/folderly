@@ -34,11 +34,12 @@ export const showDialog = ({ title, message, buttons }: ShowDialogOptions): Prom
 type ToastType = 'success' | 'error' | 'info';
 
 export const showToast = (type: ToastType, message: string) => {
+  console.log('Showing toast:', { type, message });
   Toast.show({
     type,
-    text1: type.charAt(0).toUpperCase() + type.slice(1),
-    text2: message,
+    text1: message,
     position: 'bottom',
     visibilityTime: 3000,
   });
+  console.log('Toast shown');
 }; 

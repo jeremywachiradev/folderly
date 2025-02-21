@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/lib/theme-provider';
 import { StorageAccessFramework } from 'expo-file-system';
 import { showDialog, showToast } from '@/lib/notifications';
+import { useAuth } from '@/lib/auth-provider';
 
 interface CategoryFormProps {
   category?: Category;
@@ -58,6 +59,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
   const [isSaving, setIsSaving] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const router = useRouter();
+  const { user } = useAuth();
 
   // Update form when category data is loaded
   useEffect(() => {
@@ -146,6 +148,11 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
       return;
     }
 
+    if (!user) {
+      showToast('error', 'User is not logged in. Please log in to create a category.');
+      return;
+    }
+
     try {
       setIsSaving(true);
       if (isEditing && category) {
@@ -155,7 +162,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
           directories
         });
       } else {
-        await createCategory(name.trim(), selectedColor, directories);
+        await createCategory(name.trim(), selectedColor, directories, user.id);
       }
       router.back();
     } catch (error) {

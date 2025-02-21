@@ -11,6 +11,11 @@ import { exportConfig, importConfig } from '@/lib/configShare';
 import { Button, Card, Text } from '@/components/ui';
 import { showDialog, showToast } from '@/lib/notifications';
 import { Portal, Modal as PaperModal } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StorageAccessFramework, cacheDirectory, writeAsStringAsync } from 'expo-file-system';
+import { getSaveDirectory, setSaveDirectory, saveFile } from '@/lib/fileSystem';
+
+const CATEGORIES_STORAGE_KEY = '@folderly/categories';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -75,6 +80,9 @@ export default function ProfileScreen() {
 
   const handleConfirmImport = async () => {
     try {
+      // Save to AsyncStorage first
+      await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(importedConfig.categories));
+      // Then update the state
       await setCategories(importedConfig.categories);
       showToast('success', `Successfully imported ${importedConfig.categories.length} categories.`);
     } catch (error) {
@@ -90,6 +98,55 @@ export default function ProfileScreen() {
       await setThemePreference(newTheme);
     } catch (error) {
       showToast('error', 'Failed to update theme');
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    try {
+      if (categories.length === 0) {
+        showToast('error', 'You have no categories to save. Please create some categories first.');
+        return;
+      }
+
+      let saveDir = await getSaveDirectory();
+      
+      if (!saveDir) {
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          await showDialog({
+            title: 'Permission Required',
+            message: 'Storage access permission is required to save files',
+            buttons: [
+              {
+                text: 'OK',
+                onPress: () => {},
+              }
+            ]
+          });
+          return;
+        }
+        
+        saveDir = permissions.directoryUri;
+        await setSaveDirectory(saveDir);
+      }
+
+      const config = {
+        version: '1.1.0',
+        categories,
+        settings,
+        timestamp: Date.now()
+      };
+
+      const configJson = JSON.stringify(config, null, 2);
+      const fileName = `folderly_config_${new Date().toISOString().split('T')[0]}.json`;
+      const tempUri = `${cacheDirectory}${fileName}`;
+
+      await writeAsStringAsync(tempUri, configJson);
+      await saveFile(tempUri, fileName);
+      
+      showToast('success', 'Configuration saved successfully to your save directory.');
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Failed to save configuration');
     }
   };
 
@@ -162,6 +219,14 @@ export default function ProfileScreen() {
             {/* Configuration Management - Only show if not guest */}
             {!isGuest && (
               <View className="space-y-4 mb-8">
+                <Button
+                  variant="outline"
+                  icon="save-outline"
+                  onPress={handleSaveConfig}
+                >
+                  Save Configuration
+                </Button>
+
                 <Button
                   variant="outline"
                   icon="share-outline"
