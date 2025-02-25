@@ -92,16 +92,22 @@ export default function CategoryScreen() {
     });
   };
 
-  const handleDeleteCategory = async () => {
-    if (!category || !user) return;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  const handleDeleteCategory = async () => {
     try {
-      await deleteCategory(category.id, user.id);
-      await loadCategories();
+      setIsDeleting(true);
+      const categoryId = Array.isArray(id) ? id[0] : id;
+      await deleteCategory(categoryId, user?.$id || user?.id || 'guest');
       showToast('success', 'Category deleted successfully');
-      router.back();
+      router.push('/');
     } catch (error) {
+      console.error('Error deleting category:', error);
       showToast('error', 'Failed to delete category');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -148,8 +154,6 @@ export default function CategoryScreen() {
     outputRange: [0, -headerHeight + 64],
     extrapolate: 'clamp'
   });
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDeletePress = () => {
     setShowDeleteConfirm(true);

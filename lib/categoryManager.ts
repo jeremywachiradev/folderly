@@ -40,8 +40,16 @@ export const createCategory = async (
     console.log('Creating category:', newCategory);
     await saveCategories([...categories, newCategory]);
     console.log('Category saved locally, now synchronizing with Appwrite...');
-    await saveCategoriesToCloud(userId, [...categories, newCategory]);
-    console.log('Category synchronized with Appwrite successfully.');
+    
+    try {
+      await saveCategoriesToCloud(userId, [...categories, newCategory]);
+      console.log('Category synchronized with Appwrite successfully.');
+    } catch (cloudError) {
+      console.error('Error synchronizing with Appwrite:', cloudError);
+      console.log('Category will be available locally but not in the cloud.');
+      // Don't throw error here, continue with local success
+    }
+    
     showToast('success', 'Category created successfully!');
     return newCategory;
   } catch (error) {

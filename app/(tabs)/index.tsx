@@ -26,6 +26,7 @@ import { FileList } from '@/components/FileList/index';
 import { showDialog, showToast } from '@/lib/notifications';
 import { Modal as PaperModal, Portal } from 'react-native-paper';
 import { useAuth } from '@/lib/auth-provider';
+import { pathToSafUri } from '@/lib/androidDirectories';
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -61,6 +62,8 @@ export default function HomeScreen() {
   const [isFileSelectionMode, setIsFileSelectionMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useAuth();
+  // Add a ref to track if categories have been loaded initially
+  const initialLoadRef = useRef(false);
 
   // Initialize selected categories
   useEffect(() => {
@@ -93,9 +96,14 @@ export default function HomeScreen() {
     setSelectedFiles(new Set());
   }, [viewMode]);
 
-  // Update effect to clear selection when screen loses focus
   useFocusEffect(
     React.useCallback(() => {
+      // Only load categories on first focus or when explicitly refreshed
+      if (!initialLoadRef.current) {
+        loadCategories();
+        initialLoadRef.current = true;
+      }
+      
       return () => {
         setIsFileSelectionMode(false);
         setSelectedFiles(new Set());
@@ -107,6 +115,12 @@ export default function HomeScreen() {
   const loadFiles = async (pageNum: number, reset: boolean = false) => {
     try {
       if (!hasMore && !reset) return;
+      
+      // If explicitly refreshing, also reload categories
+      if (reset) {
+        loadCategories();
+      }
+      
       if (pageNum === 1) {
         setIsLoadingFiles(true);
         setFiles([]); // Clear only on explicit refresh
@@ -116,19 +130,12 @@ export default function HomeScreen() {
 
       const checkedCats = categories.filter(cat => selectedCategories.has(cat.id));
       // Remove duplicate directories by using a Set with the path as key
-      const uniqueDirectories = Array.from(
-        new Set(
-          checkedCats.flatMap(cat => cat.directories.map(dir => dir.path))
-        )
-      ).map(path => {
-        const dir = checkedCats
-          .flatMap(cat => cat.directories)
-          .find(dir => dir.path === path);
+      const uniqueDirectories = checkedCats.flatMap(cat => cat.directories).map(dir => {
         return {
-          path,
-          name: dir?.name || '',
+          name: dir?.name || 'Unknown',
+          path: dir?.path || '',
           type: dir?.type || 'custom',
-          uri: dir?.uri
+          uri: dir?.uri || pathToSafUri(dir?.path || '')
         };
       });
 
@@ -160,14 +167,12 @@ export default function HomeScreen() {
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadCategories();
-    }, [])
-  );
-
   const handleAddCategory = () => {
     router.push('/category/new');
+  };
+
+  const handleHelpPress = () => {
+    router.push('/help');
   };
 
   const handleCategoryPress = (id: string) => {
@@ -408,56 +413,8 @@ export default function HomeScreen() {
     handleBatchSave(selectedFilesList);
   };
 
-  const renderCategorySelectionHeader = () => (
-    <View className="px-4 flex-row justify-between items-center mb-2">
-      <Text variant="h4" weight="semibold" className="text-neutral-900 dark:text-white">
-        Categories
-      </Text>
-      {isSelectionMode && selectedModeCategories.size > 0 && (
-        <View className="flex-row">
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedModeCategories(new Set(categories.map(c => c.id)));
-            }}
-            className="mr-4"
-          >
-            <Text className="text-primary-600">Select All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              const allIds = new Set(categories.map(c => c.id));
-              const invertedSelection = new Set(
-                categories
-                  .filter(c => !selectedModeCategories.has(c.id))
-                  .map(c => c.id)
-              );
-              setSelectedModeCategories(invertedSelection);
-            }}
-            className="mr-4"
-          >
-            <Text className="text-primary-600">Invert</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setIsSelectionMode(false);
-              setSelectedModeCategories(new Set());
-            }}
-            className="mr-4"
-          >
-            <Text className="text-primary-600">Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDeleteCategories}
-            className="mr-4"
-          >
-            <Text className="text-red-500">Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderCategoryItem = ({ item: category }: { item: Category }) => (
+  // Memoize renderCategoryItem to prevent unnecessary re-renders
+  const renderCategoryItem = useCallback(({ item: category }: { item: Category }) => (
     <TouchableOpacity
       onPress={() => handleCategoryPress(category.id)}
       onLongPress={() => handleCategoryLongPress(category.id)}
@@ -522,9 +479,10 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
-  );
+  ), [isSelectionMode, selectedModeCategories, selectedCategories, isDarkMode, handleCategoryPress, handleCategoryLongPress, handleCheckmarkPress]);
 
-  const renderFileList = () => (
+  // Memoize renderFileList to prevent unnecessary re-renders
+  const renderFileList = useCallback(() => (
     <FileList
       files={visibleFiles}
       isLoading={isLoadingFiles}
@@ -535,7 +493,11 @@ export default function HomeScreen() {
           loadFiles(page + 1);
         }
       }}
-      onRefresh={() => loadFiles(1, true)}
+      onRefresh={() => {
+        // Reset the initialLoadRef to ensure categories reload on next focus
+        initialLoadRef.current = false;
+        loadFiles(1, true);
+      }}
       sortOption={sortOption}
       onSortChange={handleSortChange}
       searchQuery={searchQuery}
@@ -544,36 +506,93 @@ export default function HomeScreen() {
       onViewModeChange={setViewMode}
       showSortModal={showSortModal}
       onSortModalChange={setShowSortModal}
+      onHelpPress={handleHelpPress}
     />
-  );
+  ), [
+    visibleFiles, isLoadingFiles, isLoadingMore, hasMore, page, 
+    sortOption, searchQuery, viewMode, showSortModal, 
+    handleSortChange, setSearchQuery, setViewMode, setShowSortModal, handleHelpPress
+  ]);
 
-  const renderCategoryList = () => (
+  // Memoize renderCategoryList to prevent unnecessary re-renders
+  const renderCategoryList = useCallback(() => (
     <FlashList<Category>
       ref={categoryListRef}
-                horizontal
-                data={categories}
+      horizontal
+      data={categories}
       extraData={[selectedCategories, isSelectionMode]} // Add state dependencies
-      renderItem={({ item }: { item: Category }) => renderCategoryItem({ item })}
+      renderItem={renderCategoryItem}
       keyExtractor={(item: Category) => item.id}
       estimatedItemSize={180}
-                showsHorizontalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
       ListFooterComponent={() => (
-              <TouchableOpacity
+        <TouchableOpacity
           onPress={handleAddCategory}
           className="items-center justify-center my-2 w-12 h-12 rounded-full bg-white dark:bg-neutral-800"
-              >
-                <Ionicons
+        >
+          <Ionicons
             name="add-circle-outline"
             size={24}
             color={isDarkMode ? '#fff' : '#000'}
           />
-              </TouchableOpacity>
+        </TouchableOpacity>
       )}
       contentContainerStyle={{ paddingHorizontal: 16 }}
     />
-  );
+  ), [categories, selectedCategories, isSelectionMode, renderCategoryItem, categoryListRef, handleAddCategory, isDarkMode]);
 
-  const renderFileSelectionOptions = () => (
+  // Memoize renderCategorySelectionHeader to prevent unnecessary re-renders
+  const renderCategorySelectionHeader = useCallback(() => (
+    <View className="px-4 flex-row justify-between items-center mb-2">
+      <Text variant="h4" weight="semibold" className="text-neutral-900 dark:text-white">
+        Categories
+      </Text>
+      {isSelectionMode && selectedModeCategories.size > 0 && (
+        <View className="flex-row">
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedModeCategories(new Set(categories.map(c => c.id)));
+            }}
+            className="mr-4"
+          >
+            <Text className="text-primary-600">Select All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              const allIds = new Set(categories.map(c => c.id));
+              const invertedSelection = new Set(
+                categories
+                  .filter(c => !selectedModeCategories.has(c.id))
+                  .map(c => c.id)
+              );
+              setSelectedModeCategories(invertedSelection);
+            }}
+            className="mr-4"
+          >
+            <Text className="text-primary-600">Invert</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setIsSelectionMode(false);
+              setSelectedModeCategories(new Set());
+            }}
+            className="mr-4"
+          >
+            <Text className="text-primary-600">Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDeleteCategories}
+            className="mr-4"
+          >
+            <Text className="text-red-500">Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  ), [isSelectionMode, selectedModeCategories, categories, handleDeleteCategories]);
+
+  // Memoize renderFileSelectionOptions to prevent unnecessary re-renders
+  const renderFileSelectionOptions = useCallback(() => (
     <View className="flex-row items-center justify-between px-4 py-2">
       <View className="flex-row items-center">
         <Text className="text-neutral-900 dark:text-white font-medium">
@@ -606,7 +625,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  );
+  ), [selectedFiles, visibleFiles, handleInverseSelection]);
 
   if (isCategoriesLoading) {
     return (
@@ -635,6 +654,7 @@ export default function HomeScreen() {
             icon: "add-circle-outline",
             onPress: handleAddCategory,
           }}
+          onHelpPress={handleHelpPress}
         />
       ) : (
         <>
@@ -672,60 +692,75 @@ export default function HomeScreen() {
           >
             <Ionicons name="add" size={28} color="#ffffff" />
           </TouchableOpacity>
-
-          <SortModal
-            visible={showSortModal}
-            onClose={() => setShowSortModal(false)}
-            currentSort={sortOption}
-            onSortChange={handleSortChange}
-          />
-
-          {/* Delete Confirmation Modal */}
-          <Portal>
-            <PaperModal
-              visible={showDeleteConfirm}
-              onDismiss={() => setShowDeleteConfirm(false)}
-              contentContainerStyle={{
-                backgroundColor: isDarkMode ? '#171717' : 'white',
-                margin: 20,
-                padding: 20,
-                borderRadius: 16,
-              }}
-            >
-              <View>
-                <View className="flex-row justify-between items-center mb-4">
-                  <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
-                    Delete Categories
-                  </Text>
-                  <TouchableOpacity onPress={() => setShowDeleteConfirm(false)}>
-                    <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
-                  Are you sure you want to delete these categories? This action cannot be undone.
-                </Text>
-
-                <View className="flex-row justify-end space-x-4">
-                  <TouchableOpacity 
-                    onPress={() => setShowDeleteConfirm(false)}
-                    className="px-4 py-2"
-                  >
-                    <Text className="text-neutral-500">Cancel</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    onPress={handleConfirmDelete}
-                    className="bg-red-500 px-4 py-2 rounded-lg"
-                  >
-                    <Text className="text-white font-medium">Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </PaperModal>
-          </Portal>
         </>
       )}
+
+      {/* Floating Help Button - Always visible */}
+      <TouchableOpacity
+        onPress={handleHelpPress}
+        className="absolute bottom-24 right-6 w-12 h-12 bg-neutral-200 dark:bg-neutral-800 rounded-full items-center justify-center shadow-lg"
+        style={{
+          shadowColor: isDarkMode ? '#0077ff' : '#0077ff',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isDarkMode ? 0.3 : 0.2,
+          shadowRadius: 4,
+          elevation: 4,
+        }}
+      >
+        <Ionicons name="help" size={24} color={isDarkMode ? '#60a5fa' : '#2563eb'} />
+      </TouchableOpacity>
+
+      <SortModal
+        visible={showSortModal}
+        onClose={() => setShowSortModal(false)}
+        currentSort={sortOption}
+        onSortChange={handleSortChange}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <Portal>
+        <PaperModal
+          visible={showDeleteConfirm}
+          onDismiss={() => setShowDeleteConfirm(false)}
+          contentContainerStyle={{
+            backgroundColor: isDarkMode ? '#171717' : 'white',
+            margin: 20,
+            padding: 20,
+            borderRadius: 16,
+          }}
+        >
+          <View>
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                Delete Categories
+              </Text>
+              <TouchableOpacity onPress={() => setShowDeleteConfirm(false)}>
+                <Ionicons name="close" size={24} color={isDarkMode ? '#ffffff' : '#000000'} />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+              Are you sure you want to delete these categories? This action cannot be undone.
+            </Text>
+
+            <View className="flex-row justify-end space-x-4">
+              <TouchableOpacity 
+                onPress={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2"
+              >
+                <Text className="text-neutral-500">Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={handleConfirmDelete}
+                className="bg-red-500 px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white font-medium">Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </PaperModal>
+      </Portal>
     </SafeAreaView>
   );
 }

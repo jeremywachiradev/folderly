@@ -14,6 +14,9 @@ import { Portal, Modal as PaperModal } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StorageAccessFramework, cacheDirectory, writeAsStringAsync } from 'expo-file-system';
 import { getSaveDirectory, setSaveDirectory, saveFile } from '@/lib/fileSystem';
+import { AndroidDirectory } from '@/lib/androidDirectories';
+import { Category } from '@/lib/categoryManager';
+import { deleteUserCategories } from '@/lib/config-sync';
 
 const CATEGORIES_STORAGE_KEY = '@folderly/categories';
 
@@ -206,8 +209,6 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Card>
-
-        
 
         {/* Settings */}
         <Card variant="elevated" className="mx-4 mb-4">

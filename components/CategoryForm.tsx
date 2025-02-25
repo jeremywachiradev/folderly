@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Category, createCategory, updateCategory } from '../lib/categoryManager';
-import { AndroidDirectory, hasStoragePermissions, requestAndroidPermissions, openAndroidFilesSettings } from '../lib/androidDirectories';
+import { AndroidDirectory, hasStoragePermissions, requestAndroidPermissions, openAndroidFilesSettings, handleMissingDirectory } from '../lib/androidDirectories';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/lib/theme-provider';
 import { StorageAccessFramework } from 'expo-file-system';
@@ -102,70 +102,152 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
 
   const checkForSelectedDirectory = async () => {
     try {
-      const selectedDirsJson = await AsyncStorage.getItem('@folderly/selected_directories');
-      if (selectedDirsJson) {
-        const selectedDirs = JSON.parse(selectedDirsJson) as AndroidDirectory[];
-        // Format the paths if they're SAF URIs
-        const formattedDirs = selectedDirs.map(dir => ({
-          ...dir,
-          path: dir.path.startsWith('content://') ? formatSAFUri(dir.path) : dir.path
-        }));
+      // Check if there's a selected directory in AsyncStorage
+      const selectedDirJson = await AsyncStorage.getItem('@folderly/selected_directories');
+      if (selectedDirJson) {
+        const selectedDirs = JSON.parse(selectedDirJson);
         
-        setDirectories(prev => {
-          // Filter out any duplicates
-          const newDirs = formattedDirs.filter(newDir => 
-            !prev.some(existingDir => existingDir.path === newDir.path)
-          );
-          return [...prev, ...newDirs];
-        });
+        // Add each directory that's not already in the list
+        const updatedDirectories = [...directories];
+        let hasNewDirectories = false;
         
-        // Clear the selected directories
+        for (const dirObj of selectedDirs) {
+          if (!directories.some(dir => dir.path === dirObj.path)) {
+            updatedDirectories.push(dirObj);
+            hasNewDirectories = true;
+          }
+        }
+        
+        if (hasNewDirectories) {
+          setDirectories(updatedDirectories);
+        }
+        
+        // Clear the selected directory from AsyncStorage
         await AsyncStorage.removeItem('@folderly/selected_directories');
       }
-
-      // Restore form state if it exists
-      const formStateJson = await AsyncStorage.getItem('@folderly/category_form_state');
-      if (formStateJson) {
-        const formState = JSON.parse(formStateJson);
-        if (!isEditing) {  // Only restore state if not in editing mode
-          setName(formState.name || '');
-          setSelectedColor(formState.selectedColor || DEFAULT_COLORS[0]);
-        }
-      }
     } catch (error) {
-      console.error('Error checking for selected directories:', error);
+      console.error('Error checking for selected directory:', error);
     }
   };
 
+  const validateDirectories = async () => {
+    if (directories.length === 0) return;
+    
+    const validatedDirs = [...directories];
+    let hasInvalidDir = false;
+    
+    for (let i = 0; i < validatedDirs.length; i++) {
+      const dir = validatedDirs[i];
+      
+      // Skip validation for directories that have already been validated
+      if (dir.validated) continue;
+      
+      try {
+        // For SAF URIs
+        if (dir.path.startsWith('content://')) {
+          try {
+            await StorageAccessFramework.readDirectoryAsync(dir.path);
+            validatedDirs[i] = { ...dir, validated: true };
+          } catch (error) {
+            console.log(`Directory not accessible: ${dir.path}`);
+            hasInvalidDir = true;
+            
+            // Show a user-friendly message for default directories
+            if (dir.name.includes('WhatsApp') || dir.name.includes('Telegram')) {
+              showDialog({
+                title: `${dir.name} Not Found`,
+                message: `The default directory for ${dir.name} was not found on your device. This could be because the app is not installed or the directory structure is different on your device.`,
+                buttons: [
+                  {
+                    text: 'Remove Directory',
+                    onPress: () => {
+                      setDirectories(directories.filter(d => d.path !== dir.path));
+                    },
+                    style: 'destructive'
+                  },
+                  {
+                    text: 'Keep Anyway',
+                    onPress: () => {
+                      // Keep the directory but mark it as validated to avoid repeated checks
+                      const updatedDirs = [...directories];
+                      const index = updatedDirs.findIndex(d => d.path === dir.path);
+                      if (index !== -1) {
+                        updatedDirs[index] = { ...updatedDirs[index], validated: true };
+                        setDirectories(updatedDirs);
+                      }
+                    }
+                  }
+                ]
+              });
+            }
+          }
+        }
+        // For regular file paths
+        else {
+          // We can't directly check if a path exists without SAF
+          // Just mark it as validated for now
+          validatedDirs[i] = { ...dir, validated: true };
+        }
+      } catch (error) {
+        console.error(`Error validating directory ${dir.path}:`, error);
+      }
+    }
+    
+    if (!hasInvalidDir) {
+      setDirectories(validatedDirs);
+    }
+  };
+
+  useEffect(() => {
+    if (directories.length > 0) {
+      // Only validate directories that haven't been validated yet
+      const hasUnvalidatedDirectories = directories.some(dir => !dir.validated);
+      if (hasUnvalidatedDirectories) {
+        validateDirectories();
+      }
+    }
+  }, [directories]);
+
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      showToast('error', 'Please enter a category name');
-      return;
-    }
-
-    if (directories.length === 0) {
-      showToast('error', 'Please select at least one directory');
-      return;
-    }
-
-    if (!user) {
-      showToast('error', 'User is not logged in. Please log in to create a category.');
-      return;
-    }
-
     try {
+      if (!name.trim()) {
+        showToast('error', 'Please enter a category name');
+        return;
+      }
+
+      if (directories.length === 0) {
+        showToast('error', 'Please add at least one directory');
+        return;
+      }
+
       setIsSaving(true);
+
+      // Check if any directories are default WhatsApp or Telegram directories
+      const hasDefaultDirs = directories.some(dir => 
+        dir.name.includes('WhatsApp') || 
+        dir.name.includes('Telegram')
+      );
+
+      // If we have default directories, validate them before saving
+      if (hasDefaultDirs) {
+        await validateDirectories();
+      }
+
       if (isEditing && category) {
         await updateCategory(category.id, {
-          name: name.trim(),
+          name,
           color: selectedColor,
           directories
         });
+        showToast('success', 'Category updated successfully');
       } else {
-        await createCategory(name.trim(), selectedColor, directories, user.id);
+        await createCategory(name, selectedColor, directories, user?.$id || user?.id || 'guest');
+        showToast('success', 'Category created successfully');
       }
+
       router.back();
     } catch (error) {
+      console.error('Error saving category:', error);
       showToast('error', error instanceof Error ? error.message : 'Failed to save category');
     } finally {
       setIsSaving(false);

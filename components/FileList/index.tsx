@@ -49,6 +49,7 @@ interface FileListProps {
   onViewModeChange: (mode: 'grid' | 'list') => void;
   showSortModal: boolean;
   onSortModalChange: (show: boolean) => void;
+  onHelpPress?: () => void;
 }
 
 interface FileListItemProps {
@@ -318,6 +319,7 @@ export function FileList({
   onViewModeChange,
   showSortModal,
   onSortModalChange,
+  onHelpPress,
 }: FileListProps) {
   const router = useRouter();
   const { isDarkMode } = useTheme();
@@ -576,6 +578,7 @@ export function FileList({
         icon="document-outline"
         title="No files found"
         description={searchQuery ? 'Try a different search term' : 'Your files will appear here'}
+        onHelpPress={onHelpPress}
       />
     ) : null,
     ListFooterComponent: isLoadingMore ? (
@@ -604,7 +607,8 @@ export function FileList({
     isLoadingMore,
     insets.bottom,
     isViewTransitioning,
-    renderSkeletonItem
+    renderSkeletonItem,
+    onHelpPress
   ]);
 
   return (

@@ -90,7 +90,8 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
             name: dirName,
             path: uri,
             type: 'custom',
-            uri: uri
+            uri: uri,
+            validated: true
           };
 
           // If in multiple mode, add to existing directories

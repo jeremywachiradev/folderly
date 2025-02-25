@@ -15,13 +15,28 @@ interface EmptyStateProps {
   title: string;
   description: string;
   action?: EmptyStateAction;
+  onHelpPress?: () => void;
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, onHelpPress }: EmptyStateProps) {
   const { isDarkMode } = useTheme();
 
   return (
     <View className="flex-1 items-center justify-center p-8">
+      {onHelpPress && (
+        <TouchableOpacity
+          onPress={onHelpPress}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-800 items-center justify-center"
+          style={{ zIndex: 10 }}
+        >
+          <Ionicons
+            name="help"
+            size={24}
+            color={isDarkMode ? '#60a5fa' : '#2563eb'}
+          />
+        </TouchableOpacity>
+      )}
+      
       <View className="w-24 h-24 rounded-full bg-primary-50 dark:bg-primary-900/20 items-center justify-center mb-8">
         <Ionicons
           name={icon as any}

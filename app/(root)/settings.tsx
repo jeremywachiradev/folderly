@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,12 +9,28 @@ import { getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
 import { showDialog, showToast } from '@/lib/notifications';
 import { Portal, Modal as PaperModal } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCategories, createCategory, deleteCategory } from '@/lib/categoryManager';
+import { useAuth } from '@/lib/auth-provider';
+import { useCategories } from '@/lib/category-provider';
+import { 
+  AndroidDirectory, 
+  hasStoragePermissions, 
+  requestAndroidPermissions,
+  ensureDirectoryUri,
+  pathToSafUri
+} from '@/lib/androidDirectories';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { isDarkMode } = useTheme();
   const [saveDir, setSaveDir] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showRestoreCategoriesConfirm, setShowRestoreCategoriesConfirm] = useState(false);
+  const { user, signOut } = useAuth();
+  const { loadCategories } = useCategories();
+  const userId = user?.$id || user?.id || 'guest';
+  const [isRestoringCategories, setIsRestoringCategories] = useState(false);
 
   useEffect(() => {
     loadSaveDirectory();
@@ -51,6 +67,81 @@ export default function SettingsScreen() {
       showToast('error', 'Failed to reset save directory');
     } finally {
       setShowResetConfirm(false);
+    }
+  };
+
+  const handleRestoreDefaultCategories = () => {
+    setShowRestoreCategoriesConfirm(true);
+  };
+
+  const handleConfirmRestoreCategories = async () => {
+    try {
+      setIsRestoringCategories(true);
+      
+      // Delete existing categories
+      const existingCategories = await getCategories();
+      for (const category of existingCategories) {
+        await deleteCategory(category.id, userId);
+      }
+      
+      // Create default categories
+      const defaultCategories = [
+        {
+          name: 'Telegram Media',
+          color: '#0088cc',
+          directories: [
+            {
+              name: 'Telegram Images',
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
+              type: 'default' as const,
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
+              validated: true
+            },
+            {
+              name: 'Telegram Video',
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
+              type: 'default' as const,
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
+              validated: true
+            }
+          ]
+        },
+        {
+          name: 'WhatsApp Status',
+          color: '#25D366',
+          directories: [
+            {
+              name: 'WhatsApp Statuses',
+              path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+              type: 'default' as const,
+              uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
+              validated: true
+            }
+          ]
+        }
+      ];
+      
+      // Create each category directly without additional processing
+      for (const category of defaultCategories) {
+        await createCategory(
+          category.name,
+          category.color,
+          category.directories,
+          userId
+        );
+      }
+      
+      // Store default categories in AsyncStorage for potential restoration later
+      await AsyncStorage.setItem('@folderly/default_categories', JSON.stringify(defaultCategories));
+      
+      showToast('success', 'Default categories restored successfully');
+      await loadCategories();
+    } catch (error) {
+      console.error('Error restoring default categories:', error);
+      showToast('error', 'Failed to restore default categories');
+    } finally {
+      setIsRestoringCategories(false);
+      setShowRestoreCategoriesConfirm(false);
     }
   };
 
@@ -137,9 +228,41 @@ export default function SettingsScreen() {
               </View>
             </View>
           </Card>
+
+          {/* Categories Settings */}
+          <Card variant="elevated" className="m-4">
+            <View className="p-6">
+              <Text variant="h4" weight="medium" className="mb-4 text-neutral-900 dark:text-white">
+                Categories
+              </Text>
+              
+              <View className="space-y-4">
+                <TouchableOpacity
+                  onPress={handleRestoreDefaultCategories}
+                  className="flex-row items-center justify-between p-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg"
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons
+                      name="refresh-outline"
+                      size={24}
+                      color="#3b82f6"
+                    />
+                    <Text variant="body" className="ml-3 text-blue-500">
+                      Restore Default Categories
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={24}
+                    color="#3b82f6"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Card>
         </ScrollView>
 
-        {/* Reset Confirmation Modal */}
+        {/* Reset Save Directory Confirmation Modal */}
         <Portal>
           <PaperModal
             visible={showResetConfirm}
@@ -178,6 +301,69 @@ export default function SettingsScreen() {
                   className="bg-red-500 px-4 py-2 rounded-lg"
                 >
                   <Text className="text-white font-medium">Reset</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </PaperModal>
+        </Portal>
+
+        {/* Restore Default Categories Confirmation Modal */}
+        <Portal>
+          <PaperModal
+            visible={showRestoreCategoriesConfirm}
+            onDismiss={() => !isRestoringCategories && setShowRestoreCategoriesConfirm(false)}
+            contentContainerStyle={{
+              backgroundColor: isDarkMode ? '#171717' : 'white',
+              margin: 20,
+              padding: 20,
+              borderRadius: 16,
+            }}
+          >
+            <View>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                  Restore Default Categories
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => !isRestoringCategories && setShowRestoreCategoriesConfirm(false)}
+                  disabled={isRestoringCategories}
+                >
+                  <Ionicons 
+                    name="close" 
+                    size={24} 
+                    color={isRestoringCategories 
+                      ? (isDarkMode ? '#666666' : '#cccccc') 
+                      : (isDarkMode ? '#ffffff' : '#000000')} 
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+                This will delete all your current categories and restore only the default Telegram Media and WhatsApp Status categories. Are you sure you want to continue?
+              </Text>
+
+              <View className="flex-row justify-end space-x-4">
+                <TouchableOpacity 
+                  onPress={() => !isRestoringCategories && setShowRestoreCategoriesConfirm(false)}
+                  className="px-4 py-2"
+                  disabled={isRestoringCategories}
+                >
+                  <Text className={`text-neutral-${isRestoringCategories ? '400' : '500'}`}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  onPress={handleConfirmRestoreCategories}
+                  className={`bg-blue-${isRestoringCategories ? '400' : '500'} px-4 py-2 rounded-lg flex-row items-center justify-center`}
+                  disabled={isRestoringCategories}
+                >
+                  {isRestoringCategories ? (
+                    <>
+                      <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                      <Text className="text-white font-medium">Restoring...</Text>
+                    </>
+                  ) : (
+                    <Text className="text-white font-medium">Restore</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

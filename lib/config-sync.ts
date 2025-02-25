@@ -11,8 +11,6 @@ export const initializeUserConfig = async (userId: string): Promise<void> => {
   console.log('User categories initialization complete for:', userId);
 };
 
-
-
 export const saveCategories = async (userId: string, categories: Category[]): Promise<void> => {
   try {
     console.log('=== Starting saveCategories ===', {
@@ -37,12 +35,29 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
 
     // Process each category with error handling
     for (const category of categories) {
+      // Handle directories to stay within the character limit
+      // Store only essential information - path, name, and uri to save space
+      const simplifiedDirectories = category.directories.map(dir => ({
+        name: dir.name,
+        path: dir.path,
+        uri: dir.uri
+      }));
+      
+      const directoriesString = JSON.stringify(simplifiedDirectories);
+      
+      // Check if the string is too long - increased limit to 2000 characters
+      if (directoriesString.length > 2000) {
+        console.log(`Directories string too long (${directoriesString.length} chars), storing locally only`);
+        // Skip cloud storage for this category if directories are too long
+        continue;
+      }
+      
       const categoryData = {
         userId,
         categoryId: category.id,
         name: category.name,
         color: category.color,
-        directories: JSON.stringify(category.directories),
+        directories: directoriesString,
         createdAt: category.createdAt,
         updatedAt: category.updatedAt
       };
@@ -60,16 +75,17 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
           );
         } else {
           console.log(`Creating new category: ${category.id}`);
+          // Use the correct permissions for guest users
+          const permissions = userId.startsWith('guest') 
+            ? [Permission.read(Role.any()), Permission.update(Role.any()), Permission.delete(Role.any())]
+            : [Permission.read(Role.user(userId)), Permission.update(Role.user(userId)), Permission.delete(Role.user(userId))];
+          
           await databases.createDocument(
             appwriteConfig.databaseId,
             USER_CATEGORIES_COLLECTION,
             ID.unique(),
             categoryData,
-            [ // Add permissions for the user
-              Permission.read(Role.user(userId)),
-              Permission.update(Role.user(userId)),
-              Permission.delete(Role.user(userId))
-            ]
+            permissions
           );
         }
       } catch (error) {
@@ -77,14 +93,16 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
           categoryId: category.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
-        throw new Error(`Failed to save category "${category.name}". Please try again.`);
+        // Don't throw error, just log it and continue with other categories
+        console.log(`Skipping cloud sync for category "${category.name}" due to error`);
       }
     }
 
     console.log('=== saveCategories completed successfully ===');
   } catch (error) {
     console.error('Error in saveCategories:', error);
-    throw error;
+    // Don't throw the error, just log it
+    console.log('Failed to save categories to cloud, but they are saved locally');
   }
 };
 

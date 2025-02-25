@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { databases } from "../lib/appwrite";
-import { toast } from "../lib/toast";
+import { showToast } from "../lib/notifications";
 import { useAuth } from '@/lib/auth-provider'; // Ensure this import is present
 
 export const CONFIG_DATABASE_ID = "default"; // Replace with your database ID
@@ -45,7 +45,7 @@ export function ConfigurationProvider(props) {
       updatedConfig
     );
     setConfig(updatedConfig);
-    toast('Configuration updated');
+    showToast('success', 'Configuration updated successfully');
   }
 
   useEffect(() => {

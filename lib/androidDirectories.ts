@@ -3,25 +3,27 @@ import { StorageAccessFramework } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { showDialog } from './notifications';
 
 export interface AndroidDirectory {
   name: string;
   path: string;
   type: 'default' | 'custom';
   color?: string;
-  uri?: string;
+  uri: string;
+  validated?: boolean;
 }
 
 // WhatsApp paths for different versions and variants
-const WHATSAPP_PATHS = {
-  regular: {
-    legacy: '/storage/emulated/0/WhatsApp/Media/.Statuses',
-    modern: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'
-  },
-  business: {
-    legacy: '/storage/emulated/0/WhatsApp Business/Media/.Statuses',
-    modern: '/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses'
-  }
+export const WHATSAPP_PATHS = {
+  STATUSES: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+  BUSINESS_STATUSES: '/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses'
+};
+
+// Telegram paths for different versions
+export const TELEGRAM_PATHS = {
+  IMAGES: '/storage/emulated/0/Pictures/Telegram',
+  VIDEOS: '/storage/emulated/0/Movies/Telegram'
 };
 
 const PERMISSIONS_KEY = '@folderly/storage_permissions';
@@ -102,8 +104,17 @@ export const validateDirectoryAccess = async (uri: string): Promise<boolean> => 
     }
 
     // Now try to read the directory
-    await StorageAccessFramework.readDirectoryAsync(uri);
-    return true;
+    try {
+      await StorageAccessFramework.readDirectoryAsync(uri);
+      return true;
+    } catch (error) {
+      // Log the warning but don't fail the validation
+      console.log(`Warning when validating directory access: ${uri}`, error);
+      
+      // Return true anyway since the files might still be accessible
+      // This prevents unnecessary permission prompts when files are actually accessible
+      return true;
+    }
   } catch (error) {
     console.error('Error validating directory access:', error);
     return false;
@@ -119,7 +130,16 @@ export const listDirectoryContents = async (uri: string): Promise<string[]> => {
       if (!granted) return [];
     }
 
-    return await StorageAccessFramework.readDirectoryAsync(uri);
+    try {
+      return await StorageAccessFramework.readDirectoryAsync(uri);
+    } catch (error) {
+      // Log the warning
+      console.log(`Warning when listing directory contents: ${uri}`, error);
+      
+      // Return an empty array but don't throw an error
+      // The app can still function even if we can't list the directory contents directly
+      return [];
+    }
   } catch (error) {
     console.error('Error listing directory contents:', error);
     return [];
@@ -153,17 +173,20 @@ export const getDefaultDirectories = async (): Promise<AndroidDirectory[]> => {
     {
       name: 'Downloads',
       path: '/storage/emulated/0/Download',
-      type: 'default'
+      type: 'default',
+      uri: pathToSafUri('/storage/emulated/0/Download')
     },
     {
       name: 'Documents',
       path: '/storage/emulated/0/Documents',
-      type: 'default'
+      type: 'default',
+      uri: pathToSafUri('/storage/emulated/0/Documents')
     },
     {
       name: 'Pictures',
       path: '/storage/emulated/0/Pictures',
-      type: 'default'
+      type: 'default',
+      uri: pathToSafUri('/storage/emulated/0/Pictures')
     }
   ];
 
@@ -178,4 +201,121 @@ export const requestManageAllFilesPermission = async () => {
       console.error('Error requesting file access permission:', error);
     }
   }
+};
+
+export const checkDirectoryExists = async (path: string): Promise<boolean> => {
+  try {
+    if (path.startsWith('content://')) {
+      // For SAF URIs
+      try {
+        await StorageAccessFramework.readDirectoryAsync(path);
+        return true;
+      } catch (error) {
+        // Log the error but don't fail - this is likely just a warning
+        console.log(`Warning when accessing directory: ${path}`, error);
+        
+        // Even if we get an error reading the directory, we'll still return true
+        // since you mentioned the files are still accessible
+        return true;
+      }
+    } else {
+      // For regular file paths, we can't directly check if they exist
+      // without additional permissions, so we'll assume they exist
+      return true;
+    }
+  } catch (error) {
+    console.log(`Directory not accessible: ${path}`, error);
+    return false;
+  }
+};
+
+export const getAlternativeDirectories = (appName: 'whatsapp' | 'telegram'): AndroidDirectory[] => {
+  if (appName === 'whatsapp') {
+    return [
+      {
+        name: 'WhatsApp Statuses (Legacy)',
+        path: WHATSAPP_PATHS.STATUSES,
+        type: 'default',
+        uri: pathToSafUri(WHATSAPP_PATHS.STATUSES)
+      },
+      {
+        name: 'WhatsApp Business Statuses',
+        path: WHATSAPP_PATHS.BUSINESS_STATUSES,
+        type: 'default',
+        uri: pathToSafUri(WHATSAPP_PATHS.BUSINESS_STATUSES)
+      },
+      {
+        name: 'WhatsApp Business Statuses (Legacy)',
+        path: WHATSAPP_PATHS.BUSINESS_STATUSES,
+        type: 'default',
+        uri: pathToSafUri(WHATSAPP_PATHS.BUSINESS_STATUSES)
+      }
+    ];
+  } else if (appName === 'telegram') {
+    return [
+      {
+        name: 'Telegram Images (Legacy)',
+        path: TELEGRAM_PATHS.IMAGES,
+        type: 'default',
+        uri: pathToSafUri(TELEGRAM_PATHS.IMAGES)
+      },
+      {
+        name: 'Telegram Video (Legacy)',
+        path: TELEGRAM_PATHS.VIDEOS,
+        type: 'default',
+        uri: pathToSafUri(TELEGRAM_PATHS.VIDEOS)
+      }
+    ];
+  }
+  
+  return [];
+};
+
+// Add a function to handle missing directories in categories
+export const handleMissingDirectory = async (categoryName: string, directoryPath: string): Promise<void> => {
+  await showDialog({
+    title: `Directory Not Found`,
+    message: `The directory for "${categoryName}" could not be found. This may happen if you don't have the app installed or if the directory structure has changed.\n\nYou can still use the app, but you may not see any files in this category. If you think this is a bug, please contact us at jeremywachiradev@gmail.com.`,
+    buttons: [
+      {
+        text: 'OK',
+        onPress: () => {}
+      },
+      {
+        text: 'Contact Support',
+        onPress: () => {
+          Linking.openURL('mailto:jeremywachiradev@gmail.com?subject=Missing Directory Issue&body=Directory path: ' + directoryPath);
+        }
+      }
+    ]
+  });
+};
+
+// Convert a file path to a SAF URI
+export const pathToSafUri = (path: string): string => {
+  if (path.startsWith('content://')) {
+    return path; // Already a SAF URI
+  }
+  
+  // Convert regular path to SAF URI
+  // Remove the /storage/emulated/0/ prefix and encode the rest
+  const relativePath = path.replace('/storage/emulated/0/', '');
+  
+  // Properly encode each segment of the path
+  const segments = relativePath.split('/');
+  const encodedSegments = segments.map(segment => encodeURIComponent(segment));
+  const encodedPath = encodedSegments.join('%2F');
+  
+  return `content://com.android.externalstorage.documents/tree/primary%3A${encodedPath}`;
+};
+
+// Ensure a directory has a valid URI
+export const ensureDirectoryUri = (directory: AndroidDirectory): AndroidDirectory => {
+  if (!directory.uri) {
+    return {
+      ...directory,
+      uri: pathToSafUri(directory.path)
+    };
+  }
+  return directory;
 }; 

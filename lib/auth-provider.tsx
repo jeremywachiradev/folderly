@@ -7,11 +7,15 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { account, avatars } from './appwrite';
 import { initializeUserConfig, deleteUserCategories } from './config-sync';
+import { showToast } from './notifications';
+import { createCategory, getCategories } from './categoryManager';
+import { pathToSafUri } from './androidDirectories';
 
 const CATEGORIES_STORAGE_KEY = '@folderly/categories';
 
 interface User {
   id: string;
+  $id?: string;
   email: string;
   name?: string;
   avatar?: string;
@@ -69,16 +73,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const userAvatar = session.name ? avatars.getInitials(session.name) : undefined;
-        
-        setUser({
+
+        const userData = {
           id: session.$id,
           email: session.email,
           name: session.name,
           avatar: userAvatar?.toString(),
           createdAt: session.$createdAt,
           updatedAt: session.$updatedAt,
-        });
+        };
+
+        // Initialize user config in Appwrite
+        await initializeUserConfig(userData.id);
+        
+        // Create default categories if needed
+        await createDefaultCategoriesIfNeeded(userData.id);
+
+        setUser(userData);
         setIsGuest(false);
+        
+        // Store last successful auth timestamp
+        await AsyncStorage.setItem('last_successful_auth', Date.now().toString());
       } catch (sessionError) {
         console.log('No active session found:', sessionError);
         await cleanupUserData();
@@ -110,6 +125,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Function to create default categories if they don't exist
+  const createDefaultCategoriesIfNeeded = async (userId: string) => {
+    try {
+      // Check if categories already exist
+      const existingCategories = await getCategories();
+      
+      // Check if Telegram and WhatsApp categories already exist
+      const hasTelegram = existingCategories.some(cat => 
+        cat.name.toLowerCase().includes('telegram')
+      );
+      
+      const hasWhatsApp = existingCategories.some(cat => 
+        cat.name.toLowerCase().includes('whatsapp')
+      );
+      
+      // Create Telegram category if it doesn't exist
+      if (!hasTelegram) {
+        await createCategory(
+          'Telegram Media',
+          '#0088cc', // Telegram blue
+          [
+            { 
+              name: 'Telegram Images', 
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
+              type: 'default',
+              validated: true
+            },
+            { 
+              name: 'Telegram Video', 
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
+              type: 'default',
+              validated: true
+            }
+          ],
+          userId
+        );
+        console.log('Created default Telegram category');
+      }
+      
+      // Create WhatsApp category if it doesn't exist
+      if (!hasWhatsApp) {
+        await createCategory(
+          'WhatsApp Status',
+          '#25D366', // WhatsApp green
+          [
+            { 
+              name: 'WhatsApp Statuses', 
+              path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
+              type: 'default',
+              validated: true
+            }
+          ],
+          userId
+        );
+        console.log('Created default WhatsApp category');
+      }
+      
+      // Store both as default categories
+      await AsyncStorage.setItem('defaultCategories', JSON.stringify(['telegram', 'whatsapp']));
+      
+    } catch (error) {
+      console.error('Error creating default categories:', error);
+      // Don't throw error, just log it
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       await account.createSession(email, password);
@@ -127,6 +211,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Initialize user config in Appwrite
       await initializeUserConfig(userData.id);
+      
+      // Create default categories if needed
+      await createDefaultCategoriesIfNeeded(userData.id);
 
       setUser(userData);
     } catch (error) {
@@ -213,6 +300,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Initialize user config in Appwrite
       await initializeUserConfig(userData.id);
+      
+      // Create default categories if needed
+      await createDefaultCategoriesIfNeeded(userData.id);
 
       setUser(userData);
 
@@ -257,6 +347,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       console.log('Successfully set user in state');
+
+      // Initialize user config in Appwrite
+      await initializeUserConfig(compatibleUserId);
+      
+      // Create default categories if needed
+      await createDefaultCategoriesIfNeeded(compatibleUserId);
     } catch (error) {
       console.error('Error in handleOAuthCallback:', error);
       if (error instanceof Error) {
@@ -300,6 +396,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           resolve();
         }, 100);
       });
+      
+      // Create default categories for guest user
+      await createDefaultCategoriesIfNeeded(guestId);
       
       console.log('Guest mode setup completed');
     } catch (error) {
