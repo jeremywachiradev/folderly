@@ -373,16 +373,8 @@ export function FileList({
       // ... other sort options remain the same
     }
     
-    // Apply search filter if needed
-    if (searchQuery) {
-      return sorted.filter(file => 
-        file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        file.type.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
     return sorted;
-  }, [files, sortOption, searchQuery]);
+  }, [files, sortOption]);
 
   // Update file opening handler to use sorted files
   const handleFilePress = useCallback((file: FileItemType) => {

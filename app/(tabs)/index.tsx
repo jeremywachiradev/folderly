@@ -284,7 +284,8 @@ export default function HomeScreen() {
 
   // Memoize visible files to prevent unnecessary re-renders
   const visibleFiles = useMemo(() => {
-    return files.map(file => {
+    // First map the files to add display properties
+    const mappedFiles = files.map(file => {
       // Extract the actual file name from the URI
       const uriParts = file.uri.split('/');
       const fileName = uriParts[uriParts.length - 1];
@@ -301,7 +302,17 @@ export default function HomeScreen() {
         displayName: cleanFileName
       };
     });
-  }, [files]);
+
+    // Then apply search filtering if a search query exists
+    if (searchQuery) {
+      return mappedFiles.filter(file => 
+        file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        file.type.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    return mappedFiles;
+  }, [files, searchQuery]);
 
   // Optimized file opening handler
   const handleFilePress = useCallback((file: FileItemType) => {
