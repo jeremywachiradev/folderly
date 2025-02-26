@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { ThemeProvider, useTheme } from "@/lib/theme-provider";
 import { AuthProvider } from "@/lib/auth-provider";
@@ -9,6 +9,7 @@ import { SettingsProvider } from "@/lib/settings-provider";
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
+import { DialogProvider } from '@/components/ui/DialogProvider';
 import "./global.css";
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -21,22 +22,24 @@ function AppLayout() {
 
   return (
     <PaperProvider theme={theme}>
-      <StatusBar translucent style="light" backgroundColor="transparent" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          contentStyle: {
-            backgroundColor: 'transparent',
-          },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(root)" options={{ headerShown: false }} />
-        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      </Stack>
-      <Toast />
+      <DialogProvider>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            contentStyle: {
+              backgroundColor: 'transparent',
+            },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(root)" options={{ headerShown: false }} />
+          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        </Stack>
+        <Toast />
+      </DialogProvider>
     </PaperProvider>
   );
 }

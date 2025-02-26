@@ -1,11 +1,12 @@
 // Home.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Dimensions, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Dimensions, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCategories } from '@/lib/category-provider';
 import { useTheme } from '@/lib/theme-provider';
-import { Card, Text, EmptyState, Loading, Logo } from '@/components/ui';
+import { Card, Text, EmptyState, Loading, useDialog } from '@/components/ui';
+import { Logo } from '@/components/ui/Logo';
 import { FileItem, Category, SortOption } from '@/types';
 import { SortModal } from '@/components/SortModal';
 import { FileItem as FileItemComponent } from '@/components/FileItem';
@@ -23,7 +24,7 @@ import { Video } from 'expo-av';
 import { ResizeMode } from 'expo-av';
 import { useFileStore } from '@/lib/file-store';
 import { FileList } from '@/components/FileList/index';
-import { showDialog, showToast } from '@/lib/notifications';
+import { showToast } from '@/lib/notifications';
 import { Modal as PaperModal, Portal } from 'react-native-paper';
 import { useAuth } from '@/lib/auth-provider';
 import { pathToSafUri } from '@/lib/androidDirectories';
@@ -64,6 +65,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   // Add a ref to track if categories have been loaded initially
   const initialLoadRef = useRef(false);
+  const dialog = useDialog();
 
   // Initialize selected categories
   useEffect(() => {
@@ -160,7 +162,12 @@ export default function HomeScreen() {
       setHasMore(more);
       setPage(pageNum);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load files');
+      console.error('Error loading files:', error);
+      dialog.showDialog({
+        title: 'Error',
+        message: 'Failed to load files',
+        buttons: [{ text: 'OK', onPress: () => {} }]
+      });
     } finally {
       setIsLoadingFiles(false);
       setIsLoadingMore(false);
@@ -357,7 +364,12 @@ export default function HomeScreen() {
       // Implement file deletion logic
       loadFiles(1, true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete file');
+      console.error('Error deleting file:', error);
+      dialog.showDialog({
+        title: 'Error',
+        message: 'Failed to delete file',
+        buttons: [{ text: 'OK', onPress: () => {} }]
+      });
     }
   };
 
@@ -366,7 +378,12 @@ export default function HomeScreen() {
       // Implement file renaming logic
       loadFiles(1, true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to rename file');
+      console.error('Error renaming file:', error);
+      dialog.showDialog({
+        title: 'Error',
+        message: 'Failed to rename file',
+        buttons: [{ text: 'OK', onPress: () => {} }]
+      });
     }
   };
 
@@ -408,12 +425,18 @@ export default function HomeScreen() {
       }
       
       await saveFiles(files.map(file => ({ uri: file.uri, name: file.name })));
-      Alert.alert(
-        'Success',
-        `Successfully saved ${files.length} file${files.length > 1 ? 's' : ''}`
-      );
+      dialog.showDialog({
+        title: 'Success',
+        message: `Successfully saved ${files.length} file${files.length > 1 ? 's' : ''}`,
+        buttons: [{ text: 'OK', onPress: () => {} }]
+      });
     } catch (error) {
-      Alert.alert('Error', 'Failed to save files');
+      console.error('Error saving files:', error);
+      dialog.showDialog({
+        title: 'Error',
+        message: 'Failed to save files',
+        buttons: [{ text: 'OK', onPress: () => {} }]
+      });
     }
     setIsFileSelectionMode(false);
     setSelectedCategories(new Set());

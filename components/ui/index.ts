@@ -1,7 +1,7 @@
-export { Button } from './Button';
-export { Card } from './Card';
-export { Text } from './Text';
-export { Logo } from './Logo';
-export { Header } from './Header';
-export { EmptyState } from './EmptyState';
-export { Loading } from './Loading'; 
+export * from './Text';
+export * from './Button';
+export * from './Card';
+export * from './EmptyState';
+export * from './Header';
+export * from './Loading';
+export * from './DialogProvider'; 
