@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Category } from './categoryManager';
 import { useAuth } from './auth-provider';
-import { saveCategories, loadCategories } from './config-sync';
+import { saveCategories, loadCategories, deleteCategories } from './config-sync';
 import { showToast } from './notifications';
 
 const CATEGORIES_STORAGE_KEY = '@folderly/categories';
@@ -13,6 +13,7 @@ interface CategoryContextType {
   addCategory: (category: Category) => Promise<void>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  deleteAllCategories: () => Promise<void>;
   isLoading: boolean;
   loadCategories: () => Promise<void>;
 }
@@ -38,6 +39,15 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
           console.log('Loading categories from cloud for user:', user.id);
           const cloudCategories = await loadCategories(user.id);
           console.log('Successfully loaded categories from cloud:', cloudCategories.length);
+          
+          // If no categories found in cloud, check if this is the first login
+          if (cloudCategories.length === 0) {
+            const isFirstLogin = await AsyncStorage.getItem(`first_login_${user.id}`) === null;
+            if (isFirstLogin) {
+              console.log('First login detected with no categories, default categories will be created by auth provider');
+            }
+          }
+          
           setCategories(cloudCategories);
           // Also update local storage as backup
           await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cloudCategories));
@@ -63,6 +73,13 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             console.error('Error syncing local categories to cloud:', error);
             showToast('error', 'Failed to sync categories to cloud');
           }
+        }
+      } else if (user && !isGuest) {
+        // No categories in local storage for logged-in user
+        // Check if this is the first login
+        const isFirstLogin = await AsyncStorage.getItem(`first_login_${user.id}`) === null;
+        if (isFirstLogin) {
+          console.log('First login detected with no local categories, default categories will be created by auth provider');
         }
       }
     } catch (error) {
@@ -155,6 +172,54 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
     setCategories(newCategories);
   };
 
+  const deleteAllCategories = async () => {
+    try {
+      console.log('=== START: deleteAllCategories ===');
+      
+      // Save empty array to local storage
+      await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([]));
+      
+      // If user is logged in, delete all categories from cloud
+      if (!isGuest && user?.id) {
+        try {
+          // Get IDs of all categories to delete from cloud
+          const categoryIds = categories.map(cat => cat.id);
+          
+          // Delete all categories from cloud
+          if (categoryIds.length > 0) {
+            await deleteCategories(user.id, categoryIds);
+          }
+          
+          console.log('All categories deleted from cloud');
+          
+          // Reset first login flag to ensure default categories are created on next login
+          await AsyncStorage.removeItem(`first_login_${user.id}`);
+        } catch (error) {
+          console.error('Error deleting categories from cloud:', error);
+          showToast('error', 'Failed to delete all categories from cloud');
+          throw error;
+        }
+      }
+      
+      // Update state
+      setCategories([]);
+      
+      // Show success toast
+      showToast('success', 'All categories deleted successfully');
+      
+      // Only show the "default categories will be restored" message for logged-in users
+      if (!isGuest && user?.id) {
+        showToast('info', 'Default categories will be restored on next login');
+      }
+      
+      console.log('=== END: deleteAllCategories - Success ===');
+    } catch (error) {
+      console.error('=== ERROR: deleteAllCategories ===', error);
+      showToast('error', 'Failed to delete all categories');
+      throw error;
+    }
+  };
+
   return (
     <CategoryContext.Provider
       value={{
@@ -163,6 +228,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         addCategory,
         updateCategory,
         deleteCategory,
+        deleteAllCategories,
         isLoading,
         loadCategories: loadCategoriesData
       }}

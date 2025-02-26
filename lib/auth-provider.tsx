@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { account, avatars } from './appwrite';
 import { initializeUserConfig, deleteUserCategories } from './config-sync';
 import { showToast } from './notifications';
-import { createCategory, getCategories } from './categoryManager';
+import { createCategory, getCategories, Category } from './categoryManager';
 import { pathToSafUri } from './androidDirectories';
 
 const CATEGORIES_STORAGE_KEY = '@folderly/categories';
@@ -131,62 +131,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check if categories already exist
       const existingCategories = await getCategories();
       
-      // Check if Telegram and WhatsApp categories already exist
-      const hasTelegram = existingCategories.some(cat => 
-        cat.name.toLowerCase().includes('telegram')
-      );
-      
-      const hasWhatsApp = existingCategories.some(cat => 
-        cat.name.toLowerCase().includes('whatsapp')
-      );
-      
-      // Create Telegram category if it doesn't exist
-      if (!hasTelegram) {
-        await createCategory(
-          'Telegram Media',
-          '#0088cc', // Telegram blue
-          [
-            { 
-              name: 'Telegram Images', 
-              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
-              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
-              type: 'default',
-              validated: true
-            },
-            { 
-              name: 'Telegram Video', 
-              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
-              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
-              type: 'default',
-              validated: true
-            }
-          ],
-          userId
-        );
-        console.log('Created default Telegram category');
+      // If user already has categories, don't create default ones
+      if (existingCategories.length > 0) {
+        console.log('User already has categories, skipping default category creation');
+        return;
       }
       
-      // Create WhatsApp category if it doesn't exist
-      if (!hasWhatsApp) {
-        await createCategory(
-          'WhatsApp Status',
-          '#25D366', // WhatsApp green
-          [
-            { 
-              name: 'WhatsApp Statuses', 
-              path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
-              uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
-              type: 'default',
-              validated: true
-            }
-          ],
-          userId
-        );
-        console.log('Created default WhatsApp category');
+      // Check if this is the first login for the user
+      const isFirstLogin = await AsyncStorage.getItem(`first_login_${userId}`) === null;
+      
+      // Only proceed if it's the first login or there are no categories
+      if (!isFirstLogin && existingCategories.length > 0) {
+        console.log('Not first login and user has categories, skipping default category creation');
+        return;
       }
+      
+      console.log('Creating default categories for user:', userId);
+      
+      // Create Telegram category
+      await createCategory(
+        'Telegram Media',
+        '#0088cc', // Telegram blue
+        [
+          { 
+            name: 'Telegram Images', 
+            path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
+            uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
+            type: 'default',
+            validated: true
+          },
+          { 
+            name: 'Telegram Video', 
+            path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
+            uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
+            type: 'default',
+            validated: true
+          }
+        ],
+        userId
+      );
+      console.log('Created default Telegram category');
+      
+      // Create WhatsApp category
+      await createCategory(
+        'WhatsApp Status',
+        '#25D366', // WhatsApp green
+        [
+          { 
+            name: 'WhatsApp Statuses', 
+            path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+            uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
+            type: 'default',
+            validated: true
+          }
+        ],
+        userId
+      );
+      console.log('Created default WhatsApp category');
       
       // Store both as default categories
       await AsyncStorage.setItem('defaultCategories', JSON.stringify(['telegram', 'whatsapp']));
+      
+      // Mark that this user has had their first login
+      await AsyncStorage.setItem(`first_login_${userId}`, 'true');
       
     } catch (error) {
       console.error('Error creating default categories:', error);
@@ -397,8 +404,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, 100);
       });
       
-      // Create default categories for guest user
-      await createDefaultCategoriesIfNeeded(guestId);
+      // Create default categories for guest user - always create for guest users
+      await createDefaultCategoriesForGuest(guestId);
+      
+      // Backup guest categories for future guest sessions
+      const updatedCategories = await getCategories();
+      await AsyncStorage.setItem('guest_categories', JSON.stringify(updatedCategories));
       
       console.log('Guest mode setup completed');
     } catch (error) {
@@ -413,9 +424,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Function to create default categories specifically for guest users
+  const createDefaultCategoriesForGuest = async (guestId: string) => {
+    try {
+      // Check if categories already exist
+      const existingCategories = await getCategories();
+      
+      // For guest users, we always want to ensure they have the default categories
+      // Create Telegram category if it doesn't exist
+      const hasTelegram = existingCategories.some(cat => 
+        cat.name.toLowerCase().includes('telegram')
+      );
+      
+      if (!hasTelegram) {
+        // Create a local-only category for guest users
+        const newCategory: Category = {
+          id: `telegram_${Date.now().toString()}`,
+          name: 'Telegram Media',
+          color: '#0088cc', // Telegram blue
+          directories: [
+            { 
+              name: 'Telegram Images', 
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
+              type: 'default',
+              validated: true
+            },
+            { 
+              name: 'Telegram Video', 
+              path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
+              type: 'default',
+              validated: true
+            }
+          ],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        
+        // Save locally only
+        const categories = await getCategories();
+        await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([...categories, newCategory]));
+        console.log('Created default Telegram category for guest (local only)');
+      }
+      
+      // Create WhatsApp category if it doesn't exist
+      const hasWhatsApp = existingCategories.some(cat => 
+        cat.name.toLowerCase().includes('whatsapp')
+      );
+      
+      if (!hasWhatsApp) {
+        // Create a local-only category for guest users
+        const newCategory: Category = {
+          id: `whatsapp_${Date.now().toString()}`,
+          name: 'WhatsApp Status',
+          color: '#25D366', // WhatsApp green
+          directories: [
+            { 
+              name: 'WhatsApp Statuses', 
+              path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+              uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
+              type: 'default',
+              validated: true
+            }
+          ],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        
+        // Save locally only
+        const categories = await getCategories();
+        await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([...categories, newCategory]));
+        console.log('Created default WhatsApp category for guest (local only)');
+      }
+      
+      // Store both as default categories
+      await AsyncStorage.setItem('defaultCategories', JSON.stringify(['telegram', 'whatsapp']));
+      
+    } catch (error) {
+      console.error('Error creating default categories for guest:', error);
+      // Don't throw error, just log it
+    }
+  };
+
   const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      // If in guest mode, backup categories before signing out
+      if (isGuest) {
+        const currentCategories = await getCategories();
+        await AsyncStorage.setItem('guest_categories', JSON.stringify(currentCategories));
+        console.log('Guest categories backed up for future guest sessions');
+      }
       
       // Delete all sessions instead of just current
       try {
@@ -425,11 +526,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             account.deleteSession(session.$id)
           )
         );
-      } catch (e) {
-        console.log('No sessions to delete');
+      } catch (error) {
+        console.log('Error deleting sessions:', error);
+        // Continue with cleanup even if session deletion fails
       }
-
+      
       await cleanupUserData();
+      
+      console.log('Sign out complete');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;

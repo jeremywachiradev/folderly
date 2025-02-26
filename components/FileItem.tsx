@@ -6,7 +6,8 @@ import { FileItem as FileItemType } from '@/types';
 import { formatFileSize, formatDate, getFileIcon, getFileName, formatDisplayName, formatDisplayPath } from '@/lib/utils';
 import { saveFile, getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
-import { showDialog, showToast } from '@/lib/notifications';
+import { showToast } from '@/lib/notifications';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 interface FileItemProps {
   file: FileItemType;
@@ -18,6 +19,7 @@ interface FileItemProps {
 export function FileItem({ file, selected, onPress, onLongPress }: FileItemProps) {
   const { type, size, modifiedTime, path: filePath, name } = file;
   const { icon, color } = getFileIcon(type);
+  const dialog = useDialog();
 
   const handleFileSave = async () => {
     try {
@@ -26,7 +28,7 @@ export function FileItem({ file, selected, onPress, onLongPress }: FileItemProps
       if (!saveDir) {
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          await showDialog({
+          await dialog.showDialog({
             title: 'Permission Required',
             message: 'Storage access permission is required to save files',
             buttons: [
@@ -41,11 +43,13 @@ export function FileItem({ file, selected, onPress, onLongPress }: FileItemProps
         
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       await saveFile(file.uri, file.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
+      console.error('Error saving file:', error);
       showToast('error', 'Failed to save file');
     }
   };

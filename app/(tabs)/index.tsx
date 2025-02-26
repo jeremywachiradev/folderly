@@ -395,17 +395,24 @@ export default function HomeScreen() {
         // First time saving, prompt for directory
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          throw new Error('Permission to access directory was denied');
+          dialog.showDialog({
+            title: 'Permission Required',
+            message: 'Storage access permission is required to save files',
+            buttons: [{ text: 'OK', onPress: () => {} }]
+          });
+          return;
         }
         
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       await saveFile(file.uri, file.name);
+      showToast('success', 'File saved successfully');
     } catch (error) {
       console.error('Error saving file:', error);
-      throw error;
+      showToast('error', 'Failed to save file');
     }
   };
 
@@ -417,26 +424,24 @@ export default function HomeScreen() {
         // First time saving, prompt for directory
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          throw new Error('Permission to access directory was denied');
+          dialog.showDialog({
+            title: 'Permission Required',
+            message: 'Storage access permission is required to save files',
+            buttons: [{ text: 'OK', onPress: () => {} }]
+          });
+          return;
         }
         
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       await saveFiles(files.map(file => ({ uri: file.uri, name: file.name })));
-      dialog.showDialog({
-        title: 'Success',
-        message: `Successfully saved ${files.length} file${files.length > 1 ? 's' : ''}`,
-        buttons: [{ text: 'OK', onPress: () => {} }]
-      });
+      showToast('success', `Successfully saved ${files.length} file${files.length > 1 ? 's' : ''}`);
     } catch (error) {
       console.error('Error saving files:', error);
-      dialog.showDialog({
-        title: 'Error',
-        message: 'Failed to save files',
-        buttons: [{ text: 'OK', onPress: () => {} }]
-      });
+      showToast('error', 'Failed to save files');
     }
     setIsFileSelectionMode(false);
     setSelectedCategories(new Set());

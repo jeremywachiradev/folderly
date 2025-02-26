@@ -7,9 +7,10 @@ import { useTheme } from '@/lib/theme-provider';
 import { Text, EmptyState, Loading } from '@/components/ui';
 import { FileList } from '@/components/FileList';
 import { FileItem, SortOption } from '@/types';
-import { getSaveDirectory, getFilesFromDirectory } from '@/lib/fileSystem';
+import { getSaveDirectory, getFilesFromDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
-import { showDialog } from '@/lib/notifications';
+import { useDialog } from '@/components/ui/DialogProvider';
+import { showToast } from '@/lib/notifications';
 
 // Helper function to get MIME type
 function getFileType(fileName: string): string {
@@ -54,28 +55,75 @@ export default function SavedScreen() {
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [saveDir, setSaveDir] = useState<string | null>(null);
+  const dialog = useDialog();
+
+  // Load the save directory when the component mounts
+  useEffect(() => {
+    const loadSaveDir = async () => {
+      const dir = await getSaveDirectory();
+      setSaveDir(dir);
+    };
+    
+    loadSaveDir();
+  }, []);
 
   const loadSavedFiles = useCallback(async (isRefreshing = false) => {
     try {
       if (!isRefreshing) {
         setIsLoading(true);
       }
-      const saveDir = await getSaveDirectory();
       
-      if (!saveDir) {
-        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permissions.granted) {
-          await showDialog({
-            title: 'Permission Required',
-            message: 'Storage access permission is required to access saved files',
-            buttons: [{ text: 'OK', onPress: () => {} }]
-          });
+      // Get the current save directory
+      const currentSaveDir = saveDir || await getSaveDirectory();
+      
+      if (!currentSaveDir) {
+        try {
+          const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+          if (!permissions.granted) {
+            await dialog.showDialog({
+              title: 'Permission Required',
+              message: 'Storage access permission is required to access saved files',
+              buttons: [{ text: 'OK', onPress: () => {} }]
+            });
+            setIsLoading(false);
+            return;
+          }
+          
+          // Save the directory URI immediately
+          const newDirUri = permissions.directoryUri;
+          await setSaveDirectory(newDirUri);
+          setSaveDir(newDirUri);
+          showToast('success', 'Save directory set successfully');
+          
+          // Load files from the newly set directory
+          const savedFiles = await getFilesFromDirectory(newDirUri);
+          
+          // Map file system items to the FileItem type used by components
+          const mappedFiles: FileItem[] = savedFiles.map(file => ({
+            name: file.name,
+            path: file.path,
+            uri: file.uri,
+            size: file.size,
+            type: getFileType(file.name),
+            categoryId: 'saved',
+            modifiedTime: file.modificationTime,
+            displayName: file.name,
+            displayPath: file.path.split('/').slice(0, -1).join('/')
+          }));
+          
+          setFiles(mappedFiles);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error setting save directory:', error);
+          showToast('error', 'Failed to set save directory');
+          setIsLoading(false);
           return;
         }
-        return;
       }
 
-      const savedFiles = await getFilesFromDirectory(saveDir);
+      const savedFiles = await getFilesFromDirectory(currentSaveDir);
       
       // Map file system items to the FileItem type used by components
       const mappedFiles: FileItem[] = savedFiles.map(file => ({
@@ -101,14 +149,39 @@ export default function SavedScreen() {
       });
     } catch (error) {
       console.error('Error loading saved files:', error);
+      showToast('error', 'Failed to load saved files');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dialog, saveDir]);
 
+  // Reload files when the save directory changes
   useEffect(() => {
     loadSavedFiles(false);
-  }, [loadSavedFiles]);
+  }, [loadSavedFiles, saveDir]);
+
+  // Add a function to manually set the save directory
+  const handleSetSaveDirectory = async () => {
+    try {
+      setIsLoading(true);
+      const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+      
+      if (permissions.granted) {
+        const newDirUri = permissions.directoryUri;
+        await setSaveDirectory(newDirUri);
+        setSaveDir(newDirUri);
+        showToast('success', 'Save directory set successfully');
+        await loadSavedFiles(true);
+      } else {
+        showToast('error', 'Permission denied to access directory');
+      }
+    } catch (error) {
+      console.error('Error setting save directory:', error);
+      showToast('error', 'Failed to set save directory');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -126,16 +199,30 @@ export default function SavedScreen() {
           <Text variant="h4" weight="semibold" className="text-neutral-900 dark:text-white">
             Saved Files
           </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            className="p-2"
-          >
-            <Ionicons
-              name="settings-outline"
-              size={24}
-              color={isDarkMode ? '#ffffff' : '#000000'}
-            />
-          </TouchableOpacity>
+          <View className="flex-row">
+            {!saveDir && (
+              <TouchableOpacity
+                onPress={handleSetSaveDirectory}
+                className="p-2 mr-2"
+              >
+                <Ionicons
+                  name="folder-outline"
+                  size={24}
+                  color={isDarkMode ? '#ffffff' : '#000000'}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              className="p-2"
+            >
+              <Ionicons
+                name="settings-outline"
+                size={24}
+                color={isDarkMode ? '#ffffff' : '#000000'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -143,7 +230,12 @@ export default function SavedScreen() {
         <EmptyState
           icon="save-outline"
           title="No Saved Files"
-          description="Files you save will appear here."
+          description={saveDir ? "Files you save will appear here." : "Set a save directory to start saving files."}
+          action={!saveDir ? {
+            label: "Set Save Directory",
+            icon: "folder-outline",
+            onPress: handleSetSaveDirectory,
+          } : undefined}
         />
       ) : (
         <FileList

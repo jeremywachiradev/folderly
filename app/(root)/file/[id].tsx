@@ -13,10 +13,10 @@ import type { ImageErrorEventData } from 'expo-image';
 import { useRef, useState, useEffect, useMemo, useCallback, memo } from 'react';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as WebBrowser from 'expo-web-browser';
-import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { StorageAccessFramework } from 'expo-file-system';
 import { saveFile, getSaveDirectory, setSaveDirectory, getFileStats } from '@/lib/fileSystem';
+import { isAvailableAsync, shareFile } from '@/lib/sharing-utils';
 import { formatFileSize, formatDate, getFileName, formatDisplayName, formatDisplayPath } from '@/lib/utils';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,8 +25,9 @@ import { Loading } from '@/components/ui';
 import { ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { StyleSheet } from 'react-native';
-import { showDialog, showToast } from '@/lib/notifications';
+import { showToast } from '@/lib/notifications';
 import * as MediaLibrary from 'expo-media-library';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -747,27 +748,14 @@ export default function FileViewerScreen() {
     if (!file) return;
     
     try {
-      if (!(await Sharing.isAvailableAsync())) {
+      if (!(await isAvailableAsync())) {
         showToast('error', 'Sharing is not available on this device');
         return;
       }
-
-      // Create a temporary file if needed (for content:// URIs)
-      let shareUri = file.uri;
-      if (file.uri.startsWith('content://')) {
-        const tempFile = `${FileSystem.cacheDirectory}${file.name}`;
-        await FileSystem.copyAsync({
-          from: file.uri,
-          to: tempFile
-        });
-        shareUri = tempFile;
-      }
-
-      // Share the file
-      await Sharing.shareAsync(shareUri, {
+      
+      await shareFile(file.uri, {
         mimeType: file.type,
-        dialogTitle: `Share ${file.name}`,
-        UTI: file.type // for iOS
+        dialogTitle: `Share ${file.name}`
       });
     } catch (error) {
       console.error('Share error:', error);
@@ -810,39 +798,40 @@ export default function FileViewerScreen() {
     }
   };
 
-  const handleSave = async () => {
-    if (!file) {
-      showToast('error', 'No file to save');
-      return;
-    }
+  const dialog = useDialog();
 
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     try {
+      setIsSaving(true);
       let saveDir = await getSaveDirectory();
       
       if (!saveDir) {
+        // First time saving, prompt for directory
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          await showDialog({
+          dialog.showDialog({
             title: 'Permission Required',
             message: 'Storage access permission is required to save files',
-            buttons: [
-              {
-                text: 'OK',
-                onPress: () => {},
-              }
-            ]
+            buttons: [{ text: 'OK', onPress: () => {} }]
           });
+          setIsSaving(false);
           return;
         }
         
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
-      await saveFile(file.uri, file.name);
+      await saveFile(fileUri, file?.name || 'file');
       showToast('success', 'File saved successfully');
     } catch (error) {
+      console.error('Error saving file:', error);
       showToast('error', 'Failed to save file');
+    } finally {
+      setIsSaving(false);
     }
   };
 

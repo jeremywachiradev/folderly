@@ -27,10 +27,12 @@ export default function SettingsScreen() {
   const [saveDir, setSaveDir] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showRestoreCategoriesConfirm, setShowRestoreCategoriesConfirm] = useState(false);
+  const [showDeleteAllCategoriesConfirm, setShowDeleteAllCategoriesConfirm] = useState(false);
   const { user, signOut } = useAuth();
-  const { loadCategories } = useCategories();
+  const { loadCategories, deleteAllCategories } = useCategories();
   const userId = user?.$id || user?.id || 'guest';
   const [isRestoringCategories, setIsRestoringCategories] = useState(false);
+  const [isDeletingCategories, setIsDeletingCategories] = useState(false);
 
   useEffect(() => {
     loadSaveDirectory();
@@ -134,6 +136,12 @@ export default function SettingsScreen() {
       // Store default categories in AsyncStorage for potential restoration later
       await AsyncStorage.setItem('@folderly/default_categories', JSON.stringify(defaultCategories));
       
+      // Reset first login flag to ensure default categories are not recreated on next login
+      // since we've just created them
+      if (userId) {
+        await AsyncStorage.setItem(`first_login_${userId}`, 'true');
+      }
+      
       showToast('success', 'Default categories restored successfully');
       await loadCategories();
     } catch (error) {
@@ -142,6 +150,24 @@ export default function SettingsScreen() {
     } finally {
       setIsRestoringCategories(false);
       setShowRestoreCategoriesConfirm(false);
+    }
+  };
+
+  const handleDeleteAllCategories = () => {
+    setShowDeleteAllCategoriesConfirm(true);
+  };
+
+  const handleConfirmDeleteAllCategories = async () => {
+    try {
+      setIsDeletingCategories(true);
+      await deleteAllCategories();
+      showToast('success', 'All categories deleted successfully');
+    } catch (error) {
+      console.error('Error deleting all categories:', error);
+      showToast('error', 'Failed to delete all categories');
+    } finally {
+      setIsDeletingCategories(false);
+      setShowDeleteAllCategoriesConfirm(false);
     }
   };
 
@@ -257,6 +283,27 @@ export default function SettingsScreen() {
                     color="#3b82f6"
                   />
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDeleteAllCategories}
+                  className="flex-row items-center justify-between p-4 bg-red-100 dark:bg-red-900/30 rounded-lg"
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons
+                      name="trash-outline"
+                      size={24}
+                      color="#ef4444"
+                    />
+                    <Text variant="body" className="ml-3 text-red-500">
+                      Delete All Categories
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={24}
+                    color="#ef4444"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
           </Card>
@@ -363,6 +410,69 @@ export default function SettingsScreen() {
                     </>
                   ) : (
                     <Text className="text-white font-medium">Restore</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </PaperModal>
+        </Portal>
+
+        {/* Delete All Categories Confirmation Modal */}
+        <Portal>
+          <PaperModal
+            visible={showDeleteAllCategoriesConfirm}
+            onDismiss={() => !isDeletingCategories && setShowDeleteAllCategoriesConfirm(false)}
+            contentContainerStyle={{
+              backgroundColor: isDarkMode ? '#171717' : 'white',
+              margin: 20,
+              padding: 20,
+              borderRadius: 16,
+            }}
+          >
+            <View>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-xl font-rubik-medium text-neutral-900 dark:text-white">
+                  Delete All Categories
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => !isDeletingCategories && setShowDeleteAllCategoriesConfirm(false)}
+                  disabled={isDeletingCategories}
+                >
+                  <Ionicons 
+                    name="close" 
+                    size={24} 
+                    color={isDeletingCategories 
+                      ? (isDarkMode ? '#666666' : '#cccccc') 
+                      : (isDarkMode ? '#ffffff' : '#000000')} 
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-base text-neutral-600 dark:text-neutral-400 mb-6">
+                This will delete all your categories. Default categories will be restored the next time you log in or when the app checks for categories. Are you sure you want to continue?
+              </Text>
+
+              <View className="flex-row justify-end space-x-4">
+                <TouchableOpacity 
+                  onPress={() => !isDeletingCategories && setShowDeleteAllCategoriesConfirm(false)}
+                  className="px-4 py-2"
+                  disabled={isDeletingCategories}
+                >
+                  <Text className={`text-neutral-${isDeletingCategories ? '400' : '500'}`}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  onPress={handleConfirmDeleteAllCategories}
+                  className={`bg-red-${isDeletingCategories ? '400' : '500'} px-4 py-2 rounded-lg flex-row items-center justify-center`}
+                  disabled={isDeletingCategories}
+                >
+                  {isDeletingCategories ? (
+                    <>
+                      <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                      <Text className="text-white font-medium">Deleting...</Text>
+                    </>
+                  ) : (
+                    <Text className="text-white font-medium">Delete All</Text>
                   )}
                 </TouchableOpacity>
               </View>

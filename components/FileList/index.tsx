@@ -13,7 +13,8 @@ import { saveFile, saveFiles, getSaveDirectory, setSaveDirectory } from '@/lib/f
 import { StorageAccessFramework } from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFileStore } from '@/lib/file-store';
-import { showDialog, showToast } from '@/lib/notifications';
+import { showToast } from '@/lib/notifications';
+import { useDialog } from '@/components/ui/DialogProvider';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_SIZE = SCREEN_WIDTH / 2;
@@ -69,6 +70,7 @@ const FileListItem = memo(({
   viewMode 
 }: FileListItemProps) => {
   const { isDarkMode } = useTheme();
+  const dialog = useDialog();
   
   // Memoize handlers to prevent unnecessary re-renders
   const handleFileSave = useCallback(async () => {
@@ -78,7 +80,7 @@ const FileListItem = memo(({
       if (!saveDir) {
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          await showDialog({
+          await dialog.showDialog({
             title: 'Permission Required',
             message: 'Storage access permission is required to save files',
             buttons: [
@@ -93,14 +95,16 @@ const FileListItem = memo(({
         
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       await saveFile(item.uri, item.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
+      console.error('Error saving file:', error);
       showToast('error', 'Failed to save file');
     }
-  }, [item.uri, item.name]);
+  }, [item.uri, item.name, dialog]);
 
   const renderListView = () => (
     <View style={{ width: '100%', minHeight: ESTIMATED_ITEM_SIZE.list }}>
@@ -260,50 +264,6 @@ const FileListItem = memo(({
   );
 });
 
-// Add skeleton loading component
-const FileItemSkeleton = memo(({ viewMode }: { viewMode: 'grid' | 'list' }) => {
-  const { isDarkMode } = useTheme();
-  const backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-
-  if (viewMode === 'list') {
-    return (
-      <View style={{ width: '100%', minHeight: ESTIMATED_ITEM_SIZE.list }}>
-        <View className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex-row items-center">
-          <View 
-            className="w-10 h-10 rounded-lg mr-3"
-            style={{ backgroundColor }}
-          />
-          <View className="flex-1">
-            <View 
-              className="h-5 rounded mb-1 w-3/4"
-              style={{ backgroundColor }}
-            />
-            <View 
-              className="h-4 rounded mb-1 w-1/2"
-              style={{ backgroundColor }}
-            />
-            <View 
-              className="h-3 rounded w-1/3"
-              style={{ backgroundColor }}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ width: ESTIMATED_ITEM_SIZE.grid, height: ESTIMATED_ITEM_SIZE.grid }}>
-      <View className="flex-1 m-1 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800">
-        <View 
-          className="absolute inset-0"
-          style={{ backgroundColor }}
-        />
-      </View>
-    </View>
-  );
-});
-
 export function FileList({
   files,
   isLoading,
@@ -328,6 +288,7 @@ export function FileList({
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [isViewTransitioning, setIsViewTransitioning] = useState(false);
   const insets = useSafeAreaInsets();
+  const dialog = useDialog();
   
   // Use the store's setCurrentFile function directly
   const setCurrentFile = useFileStore(useCallback(state => state.setCurrentFile, []));
@@ -426,7 +387,7 @@ export function FileList({
       if (!saveDir) {
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          await showDialog({
+          await dialog.showDialog({
             title: 'Permission Required',
             message: 'Storage access permission is required to save files',
             buttons: [
@@ -439,16 +400,19 @@ export function FileList({
           return;
         }
         
+        // Save the directory URI immediately and ensure it's properly stored
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       await saveFile(file.uri, file.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
+      console.error('Error saving file:', error);
       showToast('error', 'Failed to save file');
     }
-  }, []);
+  }, [dialog]);
 
   const handleBatchSave = useCallback(async () => {
     try {
@@ -458,7 +422,7 @@ export function FileList({
       if (!saveDir) {
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          await showDialog({
+          await dialog.showDialog({
             title: 'Permission Required',
             message: 'Storage access permission is required to save files',
             buttons: [
@@ -471,8 +435,10 @@ export function FileList({
           return;
         }
         
+        // Save the directory URI immediately and ensure it's properly stored
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
+        showToast('success', 'Save directory set successfully');
       }
       
       const selectedFilesList = files.filter(f => selectedFiles.has(f.path));
@@ -481,11 +447,12 @@ export function FileList({
       setIsFileSelectionMode(false);
       setSelectedFiles(new Set());
     } catch (error) {
+      console.error('Error saving files:', error);
       showToast('error', 'Failed to save files');
     } finally {
       setIsSavingBatch(false);
     }
-  }, [files, selectedFiles]);
+  }, [files, selectedFiles, dialog]);
 
   const handleSelectAll = useCallback(() => {
     setSelectedFiles(new Set(files.map(f => f.path)));
@@ -518,90 +485,39 @@ export function FileList({
   // Add view transition handler
   const handleViewModeChange = useCallback((newMode: 'grid' | 'list') => {
     if (newMode !== viewMode) {
+      // First set the transition state to show loading
       setIsViewTransitioning(true);
-      onViewModeChange(newMode);
-      // Add a small delay to ensure smooth transition
+      
+      // Clear selection to avoid any state conflicts
+      setIsFileSelectionMode(false);
+      setSelectedFiles(new Set());
+      
+      // Use setTimeout to ensure the component has time to reset before changing mode
       setTimeout(() => {
-        setIsViewTransitioning(false);
-      }, 300);
+        // Change the view mode
+        onViewModeChange(newMode);
+        
+        // Add a small delay before removing the transition state
+        setTimeout(() => {
+          setIsViewTransitioning(false);
+        }, 150);
+      }, 50);
     }
   }, [viewMode, onViewModeChange]);
 
-  // Render skeleton items during transition
-  const renderSkeletonItem = useCallback(() => (
-    <FileItemSkeleton viewMode={viewMode} />
-  ), [viewMode]);
-
-  // Memoize FlashList props for better performance
-  const flashListProps = useMemo(() => ({
-    data: isViewTransitioning ? Array(files.length).fill({}) : files,
-    renderItem: isViewTransitioning ? renderSkeletonItem : renderItem,
-    keyExtractor: isViewTransitioning ? ((_: any, index: number) => `skeleton-${index}`) : keyExtractor,
-    estimatedItemSize: viewMode === 'grid' ? ESTIMATED_ITEM_SIZE.grid : ESTIMATED_ITEM_SIZE.list,
-    overrideItemLayout: (
-      layout: LayoutType,
-      _item: FileItemType, 
-      _index: number, 
-      maxColumns: number,
-      _extraData?: any
-    ) => {
-      if (!layout) return;
-      
-      if (viewMode === 'grid') {
-        layout.span = 1;
-        layout.size = ESTIMATED_ITEM_SIZE.grid;
-      } else {
-        layout.span = maxColumns;
-        layout.size = ESTIMATED_ITEM_SIZE.list;
-      }
-    },
-    numColumns: viewMode === 'grid' ? 2 : 1,
-    onEndReached: hasMore ? onLoadMore : undefined,
-    onEndReachedThreshold: 0.5,
-    refreshControl: (
-      <RefreshControl
-        refreshing={isLoading}
-        onRefresh={onRefresh}
-        tintColor={isDarkMode ? '#fff' : '#000'}
-      />
-    ),
-    ListEmptyComponent: !isLoading ? (
-      <EmptyState
-        icon="document-outline"
-        title="No files found"
-        description={searchQuery ? 'Try a different search term' : 'Your files will appear here'}
-        onHelpPress={onHelpPress}
-      />
-    ) : null,
-    ListFooterComponent: isLoadingMore ? (
-      <View className="py-4">
-        <ActivityIndicator />
+  // Render a completely different component during transition to avoid FlashList errors
+  if (isViewTransitioning) {
+    return (
+      <View className="flex-1 bg-white dark:bg-neutral-900">
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={isDarkMode ? '#fff' : '#000'} />
+          <Text className="mt-4 text-neutral-600 dark:text-neutral-400">
+            Changing view...
+          </Text>
+        </View>
       </View>
-    ) : null,
-    contentContainerStyle: {
-      paddingBottom: insets.bottom,
-    },
-    overscanCount: OVERSCAN_MULTIPLIER * (viewMode === 'grid' ? 10 : 5),
-    removeClippedSubviews: true,
-    initialNumToRender: viewMode === 'grid' ? 8 : 10,
-    maxToRenderPerBatch: viewMode === 'grid' ? 6 : 8,
-    windowSize: 5,
-  }), [
-    files,
-    renderItem,
-    viewMode,
-    hasMore,
-    onLoadMore,
-    isLoading,
-    onRefresh,
-    isDarkMode,
-    searchQuery,
-    isLoadingMore,
-    insets.bottom,
-    isViewTransitioning,
-    renderSkeletonItem,
-    onHelpPress
-  ]);
+    );
+  }
 
   return (
     <View className="flex-1">
@@ -676,7 +592,6 @@ export function FileList({
             <TouchableOpacity
               onPress={() => handleViewModeChange('list')}
               className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-primary-100 dark:bg-primary-800' : ''}`}
-              disabled={isViewTransitioning}
             >
               <Ionicons
                 name="list"
@@ -687,7 +602,6 @@ export function FileList({
             <TouchableOpacity
               onPress={() => handleViewModeChange('grid')}
               className={`p-2 rounded-lg ml-2 ${viewMode === 'grid' ? 'bg-primary-100 dark:bg-primary-800' : ''}`}
-              disabled={isViewTransitioning}
             >
               <Ionicons
                 name="grid"
@@ -718,7 +632,49 @@ export function FileList({
       {/* File List */}
       <View className="flex-1 bg-white dark:bg-neutral-900" onLayout={handleLayout}>
         {isLayoutReady && (
-          <FlashList {...flashListProps} />
+          <FlashList
+            data={files}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            estimatedItemSize={viewMode === 'grid' ? ESTIMATED_ITEM_SIZE.grid : ESTIMATED_ITEM_SIZE.list}
+            overrideItemLayout={(layout, _item, _index, maxColumns) => {
+              if (!layout) return;
+              
+              if (viewMode === 'grid') {
+                layout.span = 1;
+                layout.size = ESTIMATED_ITEM_SIZE.grid;
+              } else {
+                layout.span = maxColumns;
+                layout.size = ESTIMATED_ITEM_SIZE.list;
+              }
+            }}
+            numColumns={viewMode === 'grid' ? 2 : 1}
+            onEndReached={hasMore ? onLoadMore : undefined}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={onRefresh}
+                tintColor={isDarkMode ? '#fff' : '#000'}
+              />
+            }
+            ListEmptyComponent={!isLoading ? (
+              <EmptyState
+                icon="document-outline"
+                title="No files found"
+                description={searchQuery ? 'Try a different search term' : 'Your files will appear here'}
+                onHelpPress={onHelpPress}
+              />
+            ) : null}
+            ListFooterComponent={isLoadingMore ? (
+              <View className="py-4">
+                <ActivityIndicator />
+              </View>
+            ) : null}
+            contentContainerStyle={{
+              paddingBottom: insets.bottom,
+            }}
+          />
         )}
       </View>
     </View>
