@@ -10,6 +10,7 @@ export interface Category {
   directories: AndroidDirectory[];
   createdAt: number;
   updatedAt: number;
+  isChecked?: boolean;
 }
 
 const CATEGORIES_STORAGE_KEY = '@folderly/categories';

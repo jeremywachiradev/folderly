@@ -59,6 +59,7 @@ interface FileListItemProps {
   onLongPress: () => void;
   isSelected: boolean;
   viewMode: 'grid' | 'list';
+  isSelectionMode: boolean;
 }
 
 // Optimize FileListItem component with proper memo comparison
@@ -67,13 +68,22 @@ const FileListItem = memo(({
   onPress, 
   onLongPress, 
   isSelected, 
-  viewMode 
-}: FileListItemProps) => {
+  viewMode,
+  isSelectionMode
+}: FileListItemProps & { isSelectionMode: boolean }) => {
   const { isDarkMode } = useTheme();
   const dialog = useDialog();
   
+  // Add a console log to track rendering and selection state
+  useEffect(() => {
+    console.log(`FileListItem ${item.name} rendered - isSelected: ${isSelected}, isSelectionMode: ${isSelectionMode}`);
+  }, [item.name, isSelected, isSelectionMode]);
+  
   // Memoize handlers to prevent unnecessary re-renders
-  const handleFileSave = useCallback(async () => {
+  const handleFileSave = useCallback(async (e: any) => {
+    // Stop propagation to prevent triggering the onPress event of the parent
+    e.stopPropagation();
+    
     try {
       let saveDir = await getSaveDirectory();
       
@@ -114,10 +124,10 @@ const FileListItem = memo(({
         activeOpacity={0.7}
         className={`px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex-row items-center ${
           isSelected ? 'border-l-4 border-l-primary-500 bg-primary-50 dark:bg-primary-900/20' : ''
-        }`}
+        } ${isSelectionMode && !isSelected ? 'opacity-80 bg-neutral-50 dark:bg-neutral-800/50' : ''}`}
       >
         {/* File Icon */}
-        <View className="w-10 h-10 rounded-lg items-center justify-center mr-3" style={{
+        <View className={`w-10 h-10 rounded-lg items-center justify-center mr-3 ${isSelectionMode ? 'relative' : ''}`} style={{
           backgroundColor: `${getFileIcon(item.type).color}15`
         }}>
           <Ionicons
@@ -125,6 +135,13 @@ const FileListItem = memo(({
             size={24}
             color={getFileIcon(item.type).color}
           />
+          {isSelectionMode && (
+            <View className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-neutral-800 ${isSelected ? 'bg-primary-500' : 'bg-neutral-200 dark:bg-neutral-700'}`}>
+              {isSelected && (
+                <Ionicons name="checkmark" size={12} color="white" style={{ alignSelf: 'center' }} />
+              )}
+            </View>
+          )}
         </View>
 
         {/* File Info */}
@@ -159,10 +176,11 @@ const FileListItem = memo(({
         ) : (
           <TouchableOpacity 
             onPress={handleFileSave}
-            className="ml-2 p-2"
+            className={`ml-2 p-2 ${isSelectionMode ? 'opacity-50' : ''}`}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            disabled={isSelectionMode} // Disable save button in selection mode
           >
-            <Ionicons name="download-outline" size={22} color="#0077ff" />
+            <Ionicons name="download-outline" size={22} color={isSelectionMode ? "#94a3b8" : "#0077ff"} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -175,9 +193,9 @@ const FileListItem = memo(({
         onPress={onPress}
         onLongPress={onLongPress}
         activeOpacity={0.7}
-        className={`flex-1 m-1 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-800 ${
-          isSelected ? 'border-2 border-primary-500' : ''
-        }`}
+        className={`flex-1 m-1 rounded-lg overflow-hidden border ${
+          isSelected ? 'border-2 border-primary-500' : 'border-neutral-200 dark:border-neutral-800'
+        } ${isSelectionMode && !isSelected ? 'opacity-80 bg-neutral-50/50 dark:bg-neutral-800/50' : ''}`}
       >
         {/* Main Content */}
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -215,6 +233,15 @@ const FileListItem = memo(({
           )}
         </View>
 
+        {/* Selection Indicator */}
+        {isSelectionMode && (
+          <View className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 border-white dark:border-neutral-800 items-center justify-center" style={{ 
+            backgroundColor: isSelected ? '#0077ff' : 'rgba(255, 255, 255, 0.7)'
+          }}>
+            {isSelected && <Ionicons name="checkmark" size={16} color="white" />}
+          </View>
+        )}
+
         {/* File Type Indicator */}
         <View 
           className="absolute top-1 right-1 w-6 h-6 rounded items-center justify-center"
@@ -244,10 +271,11 @@ const FileListItem = memo(({
         ) : (
           <TouchableOpacity
             onPress={handleFileSave}
-            className="absolute top-1 left-1 w-8 h-8 rounded-full bg-black/30 items-center justify-center"
+            className={`absolute top-1 left-1 w-8 h-8 rounded-full bg-black/30 items-center justify-center ${isSelectionMode ? 'opacity-50' : ''}`}
             style={{ backdropFilter: 'blur(4px)' }}
+            disabled={isSelectionMode} // Disable save button in selection mode
           >
-            <Ionicons name="download-outline" size={18} color="white" />
+            <Ionicons name="download-outline" size={18} color={isSelectionMode ? "rgba(255, 255, 255, 0.5)" : "white"} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -256,12 +284,20 @@ const FileListItem = memo(({
 
   return viewMode === 'list' ? renderListView() : renderGridView();
 }, (prevProps, nextProps) => {
-  return (
+  // Return true if the props are equal (to prevent re-render)
+  const propsEqual = 
     prevProps.item.uri === nextProps.item.uri &&
     prevProps.item.modifiedTime === nextProps.item.modifiedTime &&
     prevProps.isSelected === nextProps.isSelected &&
-    prevProps.viewMode === nextProps.viewMode
-  );
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.isSelectionMode === nextProps.isSelectionMode;
+  
+  // Log when a re-render is prevented
+  if (propsEqual) {
+    console.log(`Prevented re-render for ${nextProps.item.name}`);
+  }
+  
+  return propsEqual;
 });
 
 export function FileList({
@@ -287,6 +323,7 @@ export function FileList({
   const [isFileSelectionMode, setIsFileSelectionMode] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [isViewTransitioning, setIsViewTransitioning] = useState(false);
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
   
@@ -294,9 +331,6 @@ export function FileList({
   const setCurrentFile = useFileStore(useCallback(state => state.setCurrentFile, []));
 
   // Add a layout ready state
-  const [isLayoutReady, setIsLayoutReady] = useState(false);
-
-  // Add useCallback for list layout
   const handleLayout = useCallback(() => {
     setIsLayoutReady(true);
   }, []);
@@ -340,27 +374,52 @@ export function FileList({
   // Update file opening handler to use sorted files
   const handleFilePress = useCallback((file: FileItemType) => {
     if (isFileSelectionMode) {
-      if (selectedFiles.has(file.path)) {
-        const newSelectedFiles = new Set(selectedFiles);
+      // Create a new Set to avoid mutating state directly
+      const newSelectedFiles = new Set(selectedFiles);
+      
+      if (newSelectedFiles.has(file.path)) {
+        // Simply remove this file from selection
         newSelectedFiles.delete(file.path);
-        setSelectedFiles(newSelectedFiles);
+        
+        // Exit selection mode only if no files are selected
         if (newSelectedFiles.size === 0) {
           setIsFileSelectionMode(false);
         }
       } else {
-        setSelectedFiles(new Set([...selectedFiles, file.path]));
+        // Add this file to selection
+        newSelectedFiles.add(file.path);
       }
+      
+      // Update selection state
+      setSelectedFiles(newSelectedFiles);
     } else {
-      // Set the current file in the store before navigation
+      // Not in selection mode, open the file
       setCurrentFile(file);
-      // Use base64 encoding to preserve the URI structure
       const encodedUri = btoa(file.uri);
       router.push(`/file/${encodedUri}`);
     }
   }, [isFileSelectionMode, selectedFiles, router, setCurrentFile]);
 
+  const handleFileLongPress = useCallback((file: FileItemType) => {
+    console.log('Long press on file:', file.name);
+    // Always enter selection mode on long press and add the file
+    setIsFileSelectionMode(true);
+    
+    // Create a new Set to avoid mutating state directly
+    const newSelectedFiles = new Set(selectedFiles);
+    
+    // Always add the long-pressed file to selection
+    if (!newSelectedFiles.has(file.path)) {
+      newSelectedFiles.add(file.path);
+    }
+    
+    setSelectedFiles(newSelectedFiles);
+    console.log('Updated selection after long press, now', newSelectedFiles.size, 'files selected');
+  }, [selectedFiles]);
+
   // Clear selection when view mode changes
   useEffect(() => {
+    console.log('View mode changed, clearing selection');
     setIsFileSelectionMode(false);
     setSelectedFiles(new Set());
   }, [viewMode]);
@@ -368,17 +427,68 @@ export function FileList({
   // Clear selection when component unmounts
   useEffect(() => {
     return () => {
+      console.log('Component unmounting, clearing selection');
       setIsFileSelectionMode(false);
       setSelectedFiles(new Set());
     };
   }, []);
 
-  const handleFileLongPress = useCallback((file: FileItemType) => {
+  // Add effect to handle empty selection
+  useEffect(() => {
+    console.log('Selection changed:', selectedFiles.size, 'files selected, selection mode:', isFileSelectionMode);
+    if (isFileSelectionMode && selectedFiles.size === 0) {
+      console.log('No files selected, exiting selection mode');
+      setIsFileSelectionMode(false);
+    }
+  }, [selectedFiles, isFileSelectionMode]);
+
+  // Add effect to log selection mode changes
+  useEffect(() => {
+    console.log('Selection mode changed:', isFileSelectionMode ? 'ON' : 'OFF');
+    
+    // If selection mode is turned off, clear all selections
     if (!isFileSelectionMode) {
-      setIsFileSelectionMode(true);
-      setSelectedFiles(new Set([file.path]));
+      setSelectedFiles(new Set());
     }
   }, [isFileSelectionMode]);
+
+  const handleSelectAll = useCallback(() => {
+    if (files.length > 0) {
+      // Create a new Set with all file paths
+      const allFiles = new Set(files.map(f => f.path));
+      
+      // Enter selection mode
+      setIsFileSelectionMode(true);
+      
+      // Update the selection state
+      setSelectedFiles(allFiles);
+      
+      console.log('Selected all files:', allFiles.size);
+    }
+  }, [files]);
+
+  const handleInverseSelection = useCallback(() => {
+    // Create a new Set for the inverse selection
+    const newSelectedFiles = new Set<string>();
+    
+    // Add files that are not currently selected
+    files.forEach(file => {
+      if (!selectedFiles.has(file.path)) {
+        newSelectedFiles.add(file.path);
+      }
+    });
+    
+    // Update the selection state
+    setSelectedFiles(newSelectedFiles);
+    
+    // If the inverse selection results in no files being selected, exit selection mode
+    if (newSelectedFiles.size === 0) {
+      setIsFileSelectionMode(false);
+    } else {
+      // Ensure we're in selection mode if we have files selected
+      setIsFileSelectionMode(true);
+    }
+  }, [files, selectedFiles]);
 
   const handleFileSave = useCallback(async (file: FileItemType) => {
     try {
@@ -400,7 +510,6 @@ export function FileList({
           return;
         }
         
-        // Save the directory URI immediately and ensure it's properly stored
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
         showToast('success', 'Save directory set successfully');
@@ -435,7 +544,6 @@ export function FileList({
           return;
         }
         
-        // Save the directory URI immediately and ensure it's properly stored
         saveDir = permissions.directoryUri;
         await setSaveDirectory(saveDir);
         showToast('success', 'Save directory set successfully');
@@ -454,33 +562,21 @@ export function FileList({
     }
   }, [files, selectedFiles, dialog]);
 
-  const handleSelectAll = useCallback(() => {
-    setSelectedFiles(new Set(files.map(f => f.path)));
-  }, [files]);
-
-  const handleInverseSelection = useCallback(() => {
-    setSelectedFiles(prev => {
-      const newSet = new Set(
-        files
-          .filter(f => !prev.has(f.path))
-          .map(f => f.path)
-      );
-      return newSet;
-    });
-  }, [files]);
-
   // Memoize renderItem to prevent unnecessary re-renders
   const renderItem = useCallback(({ item }: { item: FileItemType }) => {
+    const isItemSelected = selectedFiles.has(item.path);
+    
     return (
       <FileListItem
         item={item}
         onPress={() => handleFilePress(item)}
         onLongPress={() => handleFileLongPress(item)}
-        isSelected={selectedFiles.has(item.path)}
+        isSelected={isItemSelected}
         viewMode={viewMode}
+        isSelectionMode={isFileSelectionMode}
       />
     );
-  }, [viewMode, selectedFiles, handleFilePress, handleFileLongPress]);
+  }, [viewMode, selectedFiles, handleFilePress, handleFileLongPress, isFileSelectionMode]);
 
   // Add view transition handler
   const handleViewModeChange = useCallback((newMode: 'grid' | 'list') => {
@@ -525,27 +621,27 @@ export function FileList({
       {isFileSelectionMode && (
         <View className="flex-row items-center justify-between px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
           <Text variant="body" weight="medium" className="text-neutral-900 dark:text-white">
-            {selectedFiles.size} items selected
+            {selectedFiles.size} {selectedFiles.size === 1 ? 'file' : 'files'} selected
           </Text>
-          <View className="flex-row items-center">
+          <View className="flex-row items-center space-x-4">
             <TouchableOpacity 
               onPress={handleSelectAll}
-              className="px-3"
+              className="px-3 py-1.5 rounded-md bg-primary-50 dark:bg-primary-900/20"
               disabled={isSavingBatch}
             >
               <Text className="text-primary-500">Select All</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={handleInverseSelection}
-              className="px-3"
+              className="px-3 py-1.5 rounded-md bg-primary-50 dark:bg-primary-900/20"
               disabled={isSavingBatch}
             >
               <Text className="text-primary-500">Inverse</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={handleBatchSave}
-              className="px-3"
-              disabled={isSavingBatch}
+              className={`px-3 py-1.5 rounded-md ${selectedFiles.size === 0 ? 'bg-neutral-100 dark:bg-neutral-800' : 'bg-primary-50 dark:bg-primary-900/20'}`}
+              disabled={isSavingBatch || selectedFiles.size === 0}
             >
               <View className="flex-row items-center">
                 {isSavingBatch ? (
@@ -554,7 +650,9 @@ export function FileList({
                     <Text className="text-primary-500 ml-2">Saving...</Text>
                   </>
                 ) : (
-                  <Text className="text-primary-500">Save</Text>
+                  <Text className={`${selectedFiles.size === 0 ? 'text-neutral-400 dark:text-neutral-600' : 'text-primary-500'}`}>
+                    Save
+                  </Text>
                 )}
               </View>
             </TouchableOpacity>
@@ -563,10 +661,10 @@ export function FileList({
                 setSelectedFiles(new Set());
                 setIsFileSelectionMode(false);
               }}
-              className="pl-3"
+              className="px-3 py-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800"
               disabled={isSavingBatch}
             >
-              <Text className="text-primary-500">Cancel</Text>
+              <Text className="text-neutral-600 dark:text-neutral-400">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -630,13 +728,17 @@ export function FileList({
       </View>
 
       {/* File List */}
-      <View className="flex-1 bg-white dark:bg-neutral-900" onLayout={handleLayout}>
+      <View 
+        className={`flex-1 bg-white dark:bg-neutral-900 ${isFileSelectionMode ? 'border-2 border-primary-100 dark:border-primary-900/20' : ''}`} 
+        onLayout={handleLayout}
+      >
         {isLayoutReady && (
           <FlashList
             data={files}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             estimatedItemSize={viewMode === 'grid' ? ESTIMATED_ITEM_SIZE.grid : ESTIMATED_ITEM_SIZE.list}
+            extraData={[selectedFiles, isFileSelectionMode]}
             overrideItemLayout={(layout, _item, _index, maxColumns) => {
               if (!layout) return;
               

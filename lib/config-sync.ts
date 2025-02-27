@@ -2,13 +2,22 @@ import { ID, Query,Permission, Role  } from 'appwrite';
 import { databases, config as appwriteConfig } from './appwrite';
 import { Category } from './categoryManager';
 import { showToast } from './notifications';
+import { pathToSafUri } from './androidDirectories';
 
 // Use the collection ID from environment variables
 const USER_CATEGORIES_COLLECTION = process.env.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID!;
 
 export const initializeUserConfig = async (userId: string): Promise<void> => {
-  // No initialization needed for the new structure
-  console.log('User categories initialization complete for:', userId);
+  try {
+    // Validate that the user exists and has proper permissions
+    if (!userId) {
+      throw new Error('Invalid user ID');
+    }
+    console.log('User categories initialization complete for:', userId);
+  } catch (error) {
+    console.error('Error initializing user config:', error);
+    throw error;
+  }
 };
 
 export const saveCategories = async (userId: string, categories: Category[]): Promise<void> => {
@@ -24,6 +33,10 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
       throw new Error('Invalid Appwrite configuration');
     }
 
+    if (!userId) {
+      throw new Error('Invalid user ID');
+    }
+
     // Get existing categories for user
     const existingDocs = await databases.listDocuments(
       appwriteConfig.databaseId,
@@ -33,10 +46,18 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
 
     console.log('Found existing documents:', existingDocs.documents.length);
 
+    // Delete all existing categories for this user first
+    for (const doc of existingDocs.documents) {
+      await databases.deleteDocument(
+        appwriteConfig.databaseId,
+        USER_CATEGORIES_COLLECTION,
+        doc.$id
+      );
+    }
+
     // Process each category with error handling
     for (const category of categories) {
       // Handle directories to stay within the character limit
-      // Store only essential information - path, name, and uri to save space
       const simplifiedDirectories = category.directories.map(dir => ({
         name: dir.name,
         path: dir.path,
@@ -45,10 +66,9 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
       
       const directoriesString = JSON.stringify(simplifiedDirectories);
       
-      // Check if the string is too long - increased limit to 2000 characters
+      // Check if the string is too long
       if (directoriesString.length > 2000) {
         console.log(`Directories string too long (${directoriesString.length} chars), storing locally only`);
-        // Skip cloud storage for this category if directories are too long
         continue;
       }
       
@@ -59,41 +79,30 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
         color: category.color,
         directories: directoriesString,
         createdAt: category.createdAt,
-        updatedAt: category.updatedAt
+        updatedAt: category.updatedAt,
+        isChecked: category.isChecked ?? true // Default to true if not specified
       };
 
       try {
-        const existingDoc = existingDocs.documents.find(doc => doc.categoryId === category.id);
+        // Create new document with proper permissions
+        const permissions = [
+          Permission.read(Role.user(userId)),
+          Permission.update(Role.user(userId)),
+          Permission.delete(Role.user(userId))
+        ];
         
-        if (existingDoc) {
-          console.log(`Updating category: ${category.id}`);
-          await databases.updateDocument(
-            appwriteConfig.databaseId,
-            USER_CATEGORIES_COLLECTION,
-            existingDoc.$id,
-            categoryData
-          );
-        } else {
-          console.log(`Creating new category: ${category.id}`);
-          // Use the correct permissions for guest users
-          const permissions = userId.startsWith('guest') 
-            ? [Permission.read(Role.any()), Permission.update(Role.any()), Permission.delete(Role.any())]
-            : [Permission.read(Role.user(userId)), Permission.update(Role.user(userId)), Permission.delete(Role.user(userId))];
-          
-          await databases.createDocument(
-            appwriteConfig.databaseId,
-            USER_CATEGORIES_COLLECTION,
-            ID.unique(),
-            categoryData,
-            permissions
-          );
-        }
+        await databases.createDocument(
+          appwriteConfig.databaseId,
+          USER_CATEGORIES_COLLECTION,
+          ID.unique(),
+          categoryData,
+          permissions
+        );
       } catch (error) {
         console.error('Error processing category:', {
           categoryId: category.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
-        // Don't throw error, just log it and continue with other categories
         console.log(`Skipping cloud sync for category "${category.name}" due to error`);
       }
     }
@@ -101,18 +110,84 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
     console.log('=== saveCategories completed successfully ===');
   } catch (error) {
     console.error('Error in saveCategories:', error);
-    // Don't throw the error, just log it
     console.log('Failed to save categories to cloud, but they are saved locally');
+    throw error;
   }
+};
+
+const createDefaultCategories = async (userId: string): Promise<Category[]> => {
+  const defaultCategories: Category[] = [
+    {
+      id: `telegram_${Date.now()}`,
+      name: 'Telegram Media',
+      color: '#0088cc',
+      directories: [
+        {
+          name: 'Telegram Images',
+          path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images',
+          uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Images'),
+          type: 'default',
+          validated: true
+        },
+        {
+          name: 'Telegram Video',
+          path: '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
+          uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
+          type: 'default',
+          validated: true
+        }
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      isChecked: true
+    },
+    {
+      id: `whatsapp_${Date.now()}`,
+      name: 'WhatsApp Status',
+      color: '#25D366',
+      directories: [
+        {
+          name: 'WhatsApp Statuses',
+          path: '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses',
+          uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
+          type: 'default',
+          validated: true
+        }
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      isChecked: true
+    }
+  ];
+
+  // Save the default categories to the cloud
+  await saveCategories(userId, defaultCategories);
+  return defaultCategories;
 };
 
 export const loadCategories = async (userId: string): Promise<Category[]> => {
   try {
+    if (!userId) {
+      throw new Error('Invalid user ID');
+    }
+
+    if (!appwriteConfig.databaseId || !USER_CATEGORIES_COLLECTION) {
+      throw new Error('Invalid Appwrite configuration');
+    }
+
     const docs = await databases.listDocuments(
-      appwriteConfig.databaseId!,
+      appwriteConfig.databaseId,
       USER_CATEGORIES_COLLECTION,
       [Query.equal('userId', userId)]
     );
+
+    // If no categories exist for this user, create default ones
+    if (docs.documents.length === 0) {
+      console.log('No categories found for user, creating defaults...');
+      const defaultCats = await createDefaultCategories(userId);
+      await saveCategories(userId, defaultCats);
+      return defaultCats;
+    }
 
     return docs.documents.map(doc => ({
       id: doc.categoryId,
@@ -120,7 +195,8 @@ export const loadCategories = async (userId: string): Promise<Category[]> => {
       color: doc.color,
       directories: JSON.parse(doc.directories),
       createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
+      updatedAt: doc.updatedAt,
+      isChecked: doc.isChecked ?? true // Default to true if not specified
     }));
   } catch (error) {
     console.error('Error loading categories:', error);
@@ -131,8 +207,16 @@ export const loadCategories = async (userId: string): Promise<Category[]> => {
 
 export const deleteUserCategories = async (userId: string): Promise<void> => {
   try {
+    if (!userId) {
+      throw new Error('Invalid user ID');
+    }
+
+    if (!appwriteConfig.databaseId || !USER_CATEGORIES_COLLECTION) {
+      throw new Error('Invalid Appwrite configuration');
+    }
+
     const docs = await databases.listDocuments(
-      appwriteConfig.databaseId!,
+      appwriteConfig.databaseId,
       USER_CATEGORIES_COLLECTION,
       [Query.equal('userId', userId)]
     );
@@ -141,12 +225,14 @@ export const deleteUserCategories = async (userId: string): Promise<void> => {
     await Promise.all(
       docs.documents.map(doc =>
         databases.deleteDocument(
-          appwriteConfig.databaseId!,
+          appwriteConfig.databaseId,
           USER_CATEGORIES_COLLECTION,
           doc.$id
         )
       )
     );
+
+    console.log(`Successfully deleted all categories for user: ${userId}`);
   } catch (error) {
     console.error('Error deleting user categories:', error);
     showToast('error', 'Failed to delete categories from cloud');

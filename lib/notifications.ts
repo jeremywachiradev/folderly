@@ -1,5 +1,9 @@
-import { Alert } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { Portal, Modal as PaperModal } from 'react-native-paper';
+import { View, TouchableOpacity } from 'react-native';
+import { Text } from '@/components/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/lib/theme-provider';
 
 // These types are now defined in the DialogProvider component
 // We're keeping them here for backward compatibility
@@ -15,27 +19,16 @@ interface ShowDialogOptions {
   buttons: DialogButton[];
 }
 
-// This function will be replaced by the useDialog hook from DialogProvider
-// Keeping it for backward compatibility until we update all usages
+// This function is now deprecated. Please use the useDialog hook from DialogProvider instead
 export const showDialog = ({ title, message, buttons }: ShowDialogOptions): Promise<string> => {
   return new Promise((resolve) => {
-    Alert.alert(
-      title,
-      message,
-      buttons.map(button => ({
-        text: button.text,
-        onPress: () => {
-          button.onPress();
-          resolve(button.text);
-        },
-        style: button.style,
-      })),
-      { cancelable: false }
-    );
+    // Import and use the DialogProvider's showDialog function
+    const { showDialog } = require('@/components/ui/DialogProvider').useDialog();
+    showDialog({ title, message, buttons }).then(resolve);
   });
 };
 
-type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export const showToast = (type: ToastType, message: string) => {
   console.log('Showing toast:', { type, message });

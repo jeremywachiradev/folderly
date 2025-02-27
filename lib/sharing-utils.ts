@@ -1,13 +1,11 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import * as IntentLauncher from 'expo-intent-launcher';
-import * as WebBrowser from 'expo-web-browser';
+import * as Sharing from 'expo-sharing';
 import { showToast } from './notifications';
 
 // A utility to check if sharing is available on the current platform
 export const isAvailableAsync = async (): Promise<boolean> => {
-  // Sharing is available on all platforms
-  return true;
+  return Sharing.isAvailableAsync();
 };
 
 // A utility to share files
@@ -32,25 +30,12 @@ export const shareFile = async (
       shareUri = tempFile;
     }
 
-    if (Platform.OS === 'android') {
-      // Use Android Intent system
-      await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-        type: options?.mimeType || 'application/octet-stream',
-        data: shareUri,
-        extra: {
-          'android.intent.extra.SUBJECT': options?.dialogTitle || 'Share File',
-          'android.intent.extra.STREAM': shareUri
-        },
-        flags: 1
-      });
-    } else if (Platform.OS === 'ios') {
-      // For iOS, we'll use a simple URL scheme
-      // This is a fallback and not as good as the native sharing
-      await WebBrowser.openBrowserAsync(shareUri);
-    } else {
-      // Web or other platforms
-      showToast('error', 'Sharing is not supported on this platform');
-    }
+    // Use expo-sharing which handles file URI permissions properly
+    await Sharing.shareAsync(shareUri, {
+      mimeType: options?.mimeType,
+      dialogTitle: options?.dialogTitle,
+      UTI: options?.UTI
+    });
   } catch (error) {
     console.error('Error sharing file:', error);
     throw error;

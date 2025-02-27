@@ -459,7 +459,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           ],
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          isChecked: true // Set checked by default for guest users
         };
         
         // Save locally only
@@ -489,7 +490,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           ],
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          isChecked: true // Set checked by default for guest users
         };
         
         // Save locally only

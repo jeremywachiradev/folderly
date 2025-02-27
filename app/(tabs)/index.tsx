@@ -28,6 +28,7 @@ import { showToast } from '@/lib/notifications';
 import { Modal as PaperModal, Portal } from 'react-native-paper';
 import { useAuth } from '@/lib/auth-provider';
 import { pathToSafUri } from '@/lib/androidDirectories';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -67,10 +68,30 @@ export default function HomeScreen() {
   const initialLoadRef = useRef(false);
   const dialog = useDialog();
 
-  // Initialize selected categories
+  // Add a constant for storing selected categories
+  const SELECTED_CATEGORIES_KEY = '@folderly/selected_categories';
+
+  // Initialize selected categories from AsyncStorage
   useEffect(() => {
-    const initialSelected = new Set(categories.map(cat => cat.id));
-    setSelectedCategories(initialSelected);
+    const loadSelectedCategories = async () => {
+      try {
+        const savedSelection = await AsyncStorage.getItem(SELECTED_CATEGORIES_KEY);
+        if (savedSelection) {
+          setSelectedCategories(new Set(JSON.parse(savedSelection)));
+        } else {
+          // If no saved selection, select all categories by default
+          setSelectedCategories(new Set(categories.map(cat => cat.id)));
+        }
+      } catch (error) {
+        console.error('Error loading selected categories:', error);
+        // Default to all categories if there's an error
+        setSelectedCategories(new Set(categories.map(cat => cat.id)));
+      }
+    };
+    
+    if (categories.length > 0) {
+      loadSelectedCategories();
+    }
   }, [categories]);
 
   // Load files when categories or sort option changes
@@ -107,9 +128,10 @@ export default function HomeScreen() {
       }
       
       return () => {
+        // Only clear file selection mode when leaving the screen
         setIsFileSelectionMode(false);
         setSelectedFiles(new Set());
-        setIsSelectionMode(false); // Only clear selection mode, not the actual selections
+        // Don't reset category selection mode or selected categories
       };
     }, [])
   );
@@ -118,8 +140,8 @@ export default function HomeScreen() {
     try {
       if (!hasMore && !reset) return;
       
-      // If explicitly refreshing, also reload categories
-      if (reset) {
+      // Only reload categories if explicitly requested and not during a category check/uncheck
+      if (reset && !isLoadingFiles) {
         loadCategories();
       }
       
@@ -130,7 +152,18 @@ export default function HomeScreen() {
         setIsLoadingMore(true);
       }
 
+      // Only use categories that are currently selected
       const checkedCats = categories.filter(cat => selectedCategories.has(cat.id));
+      
+      // If no categories are selected, don't try to load files
+      if (checkedCats.length === 0) {
+        setFiles([]);
+        setHasMore(false);
+        setIsLoadingFiles(false);
+        setIsLoadingMore(false);
+        return;
+      }
+      
       // Remove duplicate directories by using a Set with the path as key
       const uniqueDirectories = checkedCats.flatMap(cat => cat.directories).map(dir => {
         return {
@@ -202,24 +235,79 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCheckmarkPress = (e: any, id: string) => {
+  const handleCheckmarkPress = async (e: any, id: string) => {
     e.stopPropagation(); // Prevent category press event
     
     // Only allow checkmark toggle if not in selection mode
     if (!isSelectionMode) {
-      setSelectedCategories(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(id)) {
-          newSet.delete(id);
-        } else {
-          newSet.add(id);
-        }
-        return newSet;
-      });
-      // Force category list to update
-      categoryListRef.current?.prepareForLayoutAnimationRender();
-      // Update files based on checked categories
-      loadFiles(1, true);
+      const newSelectedCategories = new Set(selectedCategories);
+      if (newSelectedCategories.has(id)) {
+        newSelectedCategories.delete(id);
+      } else {
+        newSelectedCategories.add(id);
+      }
+      
+      // Update state
+      setSelectedCategories(newSelectedCategories);
+      
+      // Persist selection to AsyncStorage
+      try {
+        await AsyncStorage.setItem(
+          SELECTED_CATEGORIES_KEY, 
+          JSON.stringify(Array.from(newSelectedCategories))
+        );
+      } catch (error) {
+        console.error('Error saving selected categories:', error);
+      }
+      
+      // Only update the category list UI without forcing a full refresh
+      if (categoryListRef.current) {
+        categoryListRef.current.prepareForLayoutAnimationRender();
+      }
+      
+      // Update files based on checked categories without forcing a full refresh
+      setIsLoadingFiles(true);
+      
+      // Only use categories that are currently selected
+      const checkedCats = categories.filter(cat => newSelectedCategories.has(cat.id));
+      
+      // If no categories are selected, clear the files list
+      if (checkedCats.length === 0) {
+        setFiles([]);
+        setHasMore(false);
+        setIsLoadingFiles(false);
+        return;
+      }
+      
+      try {
+        // Remove duplicate directories by using a Set with the path as key
+        const uniqueDirectories = checkedCats.flatMap(cat => cat.directories).map(dir => {
+          return {
+            name: dir?.name || 'Unknown',
+            path: dir?.path || '',
+            type: dir?.type || 'custom',
+            uri: dir?.uri || pathToSafUri(dir?.path || '')
+          };
+        });
+
+        const { files: newFiles, hasMore: more } = await listFiles(uniqueDirectories, 1, sortOption);
+        
+        // Ensure files are unique by path
+        const uniqueFiles = newFiles.reduce((acc, file) => {
+          if (!acc.some(f => f.path === file.path)) {
+            acc.push(file);
+          }
+          return acc;
+        }, [] as typeof newFiles);
+
+        setFiles(uniqueFiles);
+        setHasMore(more);
+        setPage(1);
+      } catch (error) {
+        console.error('Error loading files after category selection change:', error);
+      } finally {
+        setIsLoadingFiles(false);
+      }
     }
   };
 
@@ -453,29 +541,33 @@ export default function HomeScreen() {
   };
 
   // Memoize renderCategoryItem to prevent unnecessary re-renders
-  const renderCategoryItem = useCallback(({ item: category }: { item: Category }) => (
+  const renderCategoryItem = useCallback(({ item: category }: { item: Category }) => {
+    const isChecked = selectedCategories.has(category.id);
+    const isSelected = isSelectionMode && selectedModeCategories.has(category.id);
+    
+    return (
     <TouchableOpacity
       onPress={() => handleCategoryPress(category.id)}
       onLongPress={() => handleCategoryLongPress(category.id)}
       activeOpacity={0.7}
       className={`mr-4 p-3 min-w-[180px] rounded-lg ${
-        isSelectionMode && selectedModeCategories.has(category.id)
+        isSelected
           ? 'border-2 border-primary-500/50'  // Add border for selected items
           : 'border-2 border-transparent'      // Transparent border for unselected
       }`}
       style={{
-        backgroundColor: isSelectionMode && selectedModeCategories.has(category.id)
+        backgroundColor: isSelected
           ? 'rgba(0, 119, 255, 0.15)'
           : isDarkMode
           ? `${category.color}15`
           : `${category.color}10`,
-        shadowColor: isSelectionMode && selectedModeCategories.has(category.id)
+        shadowColor: isSelected
           ? '#0077ff'
           : 'transparent',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
-        elevation: isSelectionMode && selectedModeCategories.has(category.id) ? 4 : 0
+        elevation: isSelected ? 4 : 0
       }}
     >
       <View className="flex-row items-center justify-between">
@@ -505,20 +597,20 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           onPress={(e) => handleCheckmarkPress(e, category.id)}
-          className="p-2 -mr-2"
+          className={`p-2 -mr-2 ${isSelectionMode ? 'opacity-50' : ''}`}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           disabled={isSelectionMode} // Disable checkmark interaction in selection mode
         >
           <Ionicons
-            name={selectedCategories.has(category.id) ? "checkmark-circle" : "checkmark-circle-outline"}
+            name={isChecked ? "checkmark-circle" : "checkmark-circle-outline"}
             size={26}
-            color={selectedCategories.has(category.id) ? category.color : isDarkMode ? '#64748b' : '#94a3b8'}
+            color={isChecked ? category.color : isDarkMode ? '#64748b' : '#94a3b8'}
             style={{ opacity: isSelectionMode ? 0.5 : 1 }} // Dim the checkmark in selection mode
           />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
-  ), [isSelectionMode, selectedModeCategories, selectedCategories, isDarkMode, handleCategoryPress, handleCategoryLongPress, handleCheckmarkPress]);
+  )}, [isSelectionMode, selectedModeCategories, selectedCategories, isDarkMode, handleCategoryPress, handleCategoryLongPress, handleCheckmarkPress]);
 
   // Memoize renderFileList to prevent unnecessary re-renders
   const renderFileList = useCallback(() => (
@@ -559,7 +651,7 @@ export default function HomeScreen() {
       ref={categoryListRef}
       horizontal
       data={categories}
-      extraData={[selectedCategories, isSelectionMode]} // Add state dependencies
+      extraData={[selectedCategories, isSelectionMode, selectedModeCategories]} // Add all state dependencies
       renderItem={renderCategoryItem}
       keyExtractor={(item: Category) => item.id}
       estimatedItemSize={180}
@@ -578,7 +670,7 @@ export default function HomeScreen() {
       )}
       contentContainerStyle={{ paddingHorizontal: 16 }}
     />
-  ), [categories, selectedCategories, isSelectionMode, renderCategoryItem, categoryListRef, handleAddCategory, isDarkMode]);
+  ), [categories, selectedCategories, isSelectionMode, selectedModeCategories, renderCategoryItem, categoryListRef, handleAddCategory, isDarkMode]);
 
   // Memoize renderCategorySelectionHeader to prevent unnecessary re-renders
   const renderCategorySelectionHeader = useCallback(() => (

@@ -106,7 +106,8 @@ export default function SettingsScreen() {
               uri: pathToSafUri('/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video'),
               validated: true
             }
-          ]
+          ],
+          isChecked: true
         },
         {
           name: 'WhatsApp Status',
@@ -119,7 +120,8 @@ export default function SettingsScreen() {
               uri: pathToSafUri('/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/.Statuses'),
               validated: true
             }
-          ]
+          ],
+          isChecked: true
         }
       ];
       
