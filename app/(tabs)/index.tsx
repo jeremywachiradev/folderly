@@ -79,8 +79,25 @@ export default function HomeScreen() {
         if (savedSelection) {
           setSelectedCategories(new Set(JSON.parse(savedSelection)));
         } else {
-          // If no saved selection, select all categories by default
-          setSelectedCategories(new Set(categories.map(cat => cat.id)));
+          // If no saved selection, select categories that have isChecked=true or all categories by default
+          let selectedCategoryIds = new Set(
+            categories
+              .filter(cat => cat.isChecked !== false) // Select if isChecked is true or undefined
+              .map(cat => cat.id)
+          );
+          
+          // If no categories are marked as checked, select all categories
+          if (selectedCategoryIds.size === 0) {
+            selectedCategoryIds = new Set(categories.map(cat => cat.id));
+          }
+          
+          setSelectedCategories(selectedCategoryIds);
+          
+          // Save the selection to AsyncStorage
+          await AsyncStorage.setItem(
+            SELECTED_CATEGORIES_KEY,
+            JSON.stringify(Array.from(selectedCategoryIds))
+          );
         }
       } catch (error) {
         console.error('Error loading selected categories:', error);

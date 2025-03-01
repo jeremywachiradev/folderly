@@ -144,6 +144,13 @@ export default function SettingsScreen() {
         await AsyncStorage.setItem(`first_login_${userId}`, 'true');
       }
       
+      // Get the newly created categories to get their IDs
+      const newCategories = await getCategories();
+      
+      // Update selected categories to include all default categories
+      const selectedCategoryIds = newCategories.map(cat => cat.id);
+      await AsyncStorage.setItem('@folderly/selected_categories', JSON.stringify(selectedCategoryIds));
+      
       showToast('success', 'Default categories restored successfully');
       await loadCategories();
     } catch (error) {

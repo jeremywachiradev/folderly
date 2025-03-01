@@ -195,6 +195,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Mark that this user has had their first login
       await AsyncStorage.setItem(`first_login_${userId}`, 'true');
       
+      // Get the newly created categories to get their IDs
+      const newCategories = await getCategories();
+      
+      // Update selected categories to include all default categories
+      const selectedCategoryIds = newCategories.map(cat => cat.id);
+      await AsyncStorage.setItem('@folderly/selected_categories', JSON.stringify(selectedCategoryIds));
+      
     } catch (error) {
       console.error('Error creating default categories:', error);
       // Don't throw error, just log it
@@ -500,8 +507,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Created default WhatsApp category for guest (local only)');
       }
       
-      // Store both as default categories
+      // Store default categories for future reference
       await AsyncStorage.setItem('defaultCategories', JSON.stringify(['telegram', 'whatsapp']));
+      
+      // Get the newly created categories to get their IDs
+      const allCategories = await getCategories();
+      
+      // Update selected categories to include all default categories
+      const selectedCategoryIds = allCategories.map(cat => cat.id);
+      await AsyncStorage.setItem('@folderly/selected_categories', JSON.stringify(selectedCategoryIds));
       
     } catch (error) {
       console.error('Error creating default categories for guest:', error);

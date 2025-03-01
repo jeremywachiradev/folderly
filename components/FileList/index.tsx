@@ -74,15 +74,16 @@ const FileListItem = memo(({
   const { isDarkMode } = useTheme();
   const dialog = useDialog();
   
-  // Add a console log to track rendering and selection state
-  useEffect(() => {
-    console.log(`FileListItem ${item.name} rendered - isSelected: ${isSelected}, isSelectionMode: ${isSelectionMode}`);
-  }, [item.name, isSelected, isSelectionMode]);
-  
   // Memoize handlers to prevent unnecessary re-renders
   const handleFileSave = useCallback(async (e: any) => {
     // Stop propagation to prevent triggering the onPress event of the parent
     e.stopPropagation();
+    
+    // If in selection mode, disable individual save
+    if (isSelectionMode) {
+      e.preventDefault();
+      return;
+    }
     
     try {
       let saveDir = await getSaveDirectory();
@@ -114,7 +115,7 @@ const FileListItem = memo(({
       console.error('Error saving file:', error);
       showToast('error', 'Failed to save file');
     }
-  }, [item.uri, item.name, dialog]);
+  }, [item.uri, item.name, dialog, isSelectionMode]);
 
   const renderListView = () => (
     <View style={{ width: '100%', minHeight: ESTIMATED_ITEM_SIZE.list }}>
@@ -285,20 +286,27 @@ const FileListItem = memo(({
   return viewMode === 'list' ? renderListView() : renderGridView();
 }, (prevProps, nextProps) => {
   // Return true if the props are equal (to prevent re-render)
-  const propsEqual = 
+  // Simplified memo comparison to focus on essential props
+  return (
     prevProps.item.uri === nextProps.item.uri &&
-    prevProps.item.modifiedTime === nextProps.item.modifiedTime &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.viewMode === nextProps.viewMode &&
-    prevProps.isSelectionMode === nextProps.isSelectionMode;
-  
-  // Log when a re-render is prevented
-  if (propsEqual) {
-    console.log(`Prevented re-render for ${nextProps.item.name}`);
-  }
-  
-  return propsEqual;
+    prevProps.isSelectionMode === nextProps.isSelectionMode
+  );
 });
+
+// FlashList optimizations to prevent random selection issues
+const overrideItemLayout = (layout: any, _item: any, _index: number, maxColumns: number, viewMode: 'grid' | 'list') => {
+  if (!layout) return;
+  
+  if (viewMode === 'grid') {
+    layout.span = 1;
+    layout.size = ESTIMATED_ITEM_SIZE.grid;
+  } else {
+    layout.span = maxColumns;
+    layout.size = ESTIMATED_ITEM_SIZE.list;
+  }
+};
 
 export function FileList({
   files,
@@ -334,6 +342,14 @@ export function FileList({
   const handleLayout = useCallback(() => {
     setIsLayoutReady(true);
   }, []);
+
+  // Stable access to files for callbacks
+  const filesRef = React.useRef(files);
+  
+  // Update filesRef whenever files change
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   // Memoize the sorted files to prevent unnecessary re-renders
   const sortedFiles = useMemo(() => {
@@ -371,55 +387,54 @@ export function FileList({
     return sorted;
   }, [files, sortOption]);
 
-  // Update file opening handler to use sorted files
+  // Update effect to handle empty selection
+  useEffect(() => {
+    if (isFileSelectionMode && selectedFiles.size === 0) {
+      setIsFileSelectionMode(false);
+    }
+  }, [selectedFiles, isFileSelectionMode]);
+
+  // Remove debugging log for selection mode changes
+  useEffect(() => {
+    // If selection mode is turned off, clear all selections
+    if (!isFileSelectionMode) {
+      setSelectedFiles(new Set());
+    }
+  }, [isFileSelectionMode]);
+  
+  // Improve file press handler with clearer logic
   const handleFilePress = useCallback((file: FileItemType) => {
     if (isFileSelectionMode) {
-      // Create a new Set to avoid mutating state directly
-      const newSelectedFiles = new Set(selectedFiles);
-      
-      if (newSelectedFiles.has(file.path)) {
-        // Simply remove this file from selection
-        newSelectedFiles.delete(file.path);
+      // Toggle this specific file's selection
+      setSelectedFiles(prevSelected => {
+        const newSelected = new Set(prevSelected);
         
-        // Exit selection mode only if no files are selected
-        if (newSelectedFiles.size === 0) {
-          setIsFileSelectionMode(false);
+        if (newSelected.has(file.path)) {
+          newSelected.delete(file.path);
+        } else {
+          newSelected.add(file.path);
         }
-      } else {
-        // Add this file to selection
-        newSelectedFiles.add(file.path);
-      }
-      
-      // Update selection state
-      setSelectedFiles(newSelectedFiles);
+        
+        return newSelected;
+      });
     } else {
       // Not in selection mode, open the file
       setCurrentFile(file);
       const encodedUri = btoa(file.uri);
       router.push(`/file/${encodedUri}`);
     }
-  }, [isFileSelectionMode, selectedFiles, router, setCurrentFile]);
+  }, [isFileSelectionMode, router, setCurrentFile]);
 
   const handleFileLongPress = useCallback((file: FileItemType) => {
-    console.log('Long press on file:', file.name);
     // Always enter selection mode on long press and add the file
     setIsFileSelectionMode(true);
     
-    // Create a new Set to avoid mutating state directly
-    const newSelectedFiles = new Set(selectedFiles);
-    
-    // Always add the long-pressed file to selection
-    if (!newSelectedFiles.has(file.path)) {
-      newSelectedFiles.add(file.path);
-    }
-    
-    setSelectedFiles(newSelectedFiles);
-    console.log('Updated selection after long press, now', newSelectedFiles.size, 'files selected');
-  }, [selectedFiles]);
+    // Create a new Set with only the long-pressed file to ensure clean selection state
+    setSelectedFiles(new Set([file.path]));
+  }, []);
 
   // Clear selection when view mode changes
   useEffect(() => {
-    console.log('View mode changed, clearing selection');
     setIsFileSelectionMode(false);
     setSelectedFiles(new Set());
   }, [viewMode]);
@@ -427,105 +442,49 @@ export function FileList({
   // Clear selection when component unmounts
   useEffect(() => {
     return () => {
-      console.log('Component unmounting, clearing selection');
       setIsFileSelectionMode(false);
       setSelectedFiles(new Set());
     };
   }, []);
 
-  // Add effect to handle empty selection
-  useEffect(() => {
-    console.log('Selection changed:', selectedFiles.size, 'files selected, selection mode:', isFileSelectionMode);
-    if (isFileSelectionMode && selectedFiles.size === 0) {
-      console.log('No files selected, exiting selection mode');
-      setIsFileSelectionMode(false);
-    }
-  }, [selectedFiles, isFileSelectionMode]);
-
-  // Add effect to log selection mode changes
-  useEffect(() => {
-    console.log('Selection mode changed:', isFileSelectionMode ? 'ON' : 'OFF');
-    
-    // If selection mode is turned off, clear all selections
-    if (!isFileSelectionMode) {
-      setSelectedFiles(new Set());
-    }
-  }, [isFileSelectionMode]);
-
   const handleSelectAll = useCallback(() => {
-    if (files.length > 0) {
+    if (filesRef.current.length > 0) {
       // Create a new Set with all file paths
-      const allFiles = new Set(files.map(f => f.path));
-      
-      // Enter selection mode
-      setIsFileSelectionMode(true);
+      const allFiles = new Set(filesRef.current.map(f => f.path));
       
       // Update the selection state
       setSelectedFiles(allFiles);
-      
-      console.log('Selected all files:', allFiles.size);
     }
-  }, [files]);
+  }, []);
 
   const handleInverseSelection = useCallback(() => {
-    // Create a new Set for the inverse selection
-    const newSelectedFiles = new Set<string>();
-    
-    // Add files that are not currently selected
-    files.forEach(file => {
-      if (!selectedFiles.has(file.path)) {
-        newSelectedFiles.add(file.path);
-      }
-    });
-    
-    // Update the selection state
-    setSelectedFiles(newSelectedFiles);
-    
-    // If the inverse selection results in no files being selected, exit selection mode
-    if (newSelectedFiles.size === 0) {
-      setIsFileSelectionMode(false);
-    } else {
-      // Ensure we're in selection mode if we have files selected
-      setIsFileSelectionMode(true);
-    }
-  }, [files, selectedFiles]);
-
-  const handleFileSave = useCallback(async (file: FileItemType) => {
-    try {
-      let saveDir = await getSaveDirectory();
+    setSelectedFiles(prevSelected => {
+      // Create a new Set for the inverse selection
+      const newSelected = new Set<string>();
       
-      if (!saveDir) {
-        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permissions.granted) {
-          await dialog.showDialog({
-            title: 'Permission Required',
-            message: 'Storage access permission is required to save files',
-            buttons: [
-              {
-                text: 'OK',
-                onPress: () => {},
-              }
-            ]
-          });
-          return;
+      // Add files that are not currently selected
+      filesRef.current.forEach(file => {
+        if (!prevSelected.has(file.path)) {
+          newSelected.add(file.path);
         }
-        
-        saveDir = permissions.directoryUri;
-        await setSaveDirectory(saveDir);
-        showToast('success', 'Save directory set successfully');
-      }
+      });
       
-      await saveFile(file.uri, file.name);
-      showToast('success', 'File saved successfully');
-    } catch (error) {
-      console.error('Error saving file:', error);
-      showToast('error', 'Failed to save file');
-    }
-  }, [dialog]);
+      return newSelected;
+    });
+  }, []);
 
+  // Enhanced batch save with better error handling and feedback
   const handleBatchSave = useCallback(async () => {
+    // Check if there are any files selected
+    if (selectedFiles.size === 0) {
+      showToast('error', 'No files selected for saving');
+      return;
+    }
+    
     try {
       setIsSavingBatch(true);
+      
+      // Get save directory
       let saveDir = await getSaveDirectory();
       
       if (!saveDir) {
@@ -549,9 +508,20 @@ export function FileList({
         showToast('success', 'Save directory set successfully');
       }
       
-      const selectedFilesList = files.filter(f => selectedFiles.has(f.path));
+      // Get selected files
+      const selectedFilesList = filesRef.current.filter(f => selectedFiles.has(f.path));
+      
+      if (selectedFilesList.length === 0) {
+        showToast('error', 'No valid files found for saving');
+        return;
+      }
+      
+      // Save files with better feedback
+      showToast('info', `Saving ${selectedFilesList.length} file${selectedFilesList.length > 1 ? 's' : ''}...`);
       await saveFiles(selectedFilesList.map(file => ({ uri: file.uri, name: file.name })));
       showToast('success', `Successfully saved ${selectedFilesList.length} file${selectedFilesList.length > 1 ? 's' : ''}`);
+      
+      // Exit selection mode after successful save
       setIsFileSelectionMode(false);
       setSelectedFiles(new Set());
     } catch (error) {
@@ -560,14 +530,15 @@ export function FileList({
     } finally {
       setIsSavingBatch(false);
     }
-  }, [files, selectedFiles, dialog]);
+  }, [selectedFiles, dialog]);
 
-  // Memoize renderItem to prevent unnecessary re-renders
+  // Update renderItem to ensure stable references
   const renderItem = useCallback(({ item }: { item: FileItemType }) => {
     const isItemSelected = selectedFiles.has(item.path);
     
     return (
       <FileListItem
+        key={item.uri} // Add key to help with reconciliation
         item={item}
         onPress={() => handleFilePress(item)}
         onLongPress={() => handleFileLongPress(item)}
@@ -734,22 +705,14 @@ export function FileList({
       >
         {isLayoutReady && (
           <FlashList
-            data={files}
+            data={sortedFiles}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             estimatedItemSize={viewMode === 'grid' ? ESTIMATED_ITEM_SIZE.grid : ESTIMATED_ITEM_SIZE.list}
-            extraData={[selectedFiles, isFileSelectionMode]}
-            overrideItemLayout={(layout, _item, _index, maxColumns) => {
-              if (!layout) return;
-              
-              if (viewMode === 'grid') {
-                layout.span = 1;
-                layout.size = ESTIMATED_ITEM_SIZE.grid;
-              } else {
-                layout.span = maxColumns;
-                layout.size = ESTIMATED_ITEM_SIZE.list;
-              }
-            }}
+            extraData={[selectedFiles, isFileSelectionMode, viewMode]}
+            overrideItemLayout={(layout, item, index, maxColumns) => 
+              overrideItemLayout(layout, item, index, maxColumns, viewMode)
+            }
             numColumns={viewMode === 'grid' ? 2 : 1}
             onEndReached={hasMore ? onLoadMore : undefined}
             onEndReachedThreshold={0.5}
