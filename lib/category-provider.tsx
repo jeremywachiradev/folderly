@@ -36,15 +36,15 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
       if (user && !isGuest) {
         // Try to load from cloud first
         try {
-          console.log('Loading categories from cloud for user:', user.id);
+          
           const cloudCategories = await loadCategories(user.id);
-          console.log('Successfully loaded categories from cloud:', cloudCategories.length);
+          
           
           // If no categories found in cloud, check if this is the first login
           if (cloudCategories.length === 0) {
             const isFirstLogin = await AsyncStorage.getItem(`first_login_${user.id}`) === null;
             if (isFirstLogin) {
-              console.log('First login detected with no categories, default categories will be created by auth provider');
+              
             }
           }
           
@@ -54,7 +54,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
           return;
         } catch (error) {
-          console.error('Error loading cloud categories:', error);
+          
           showToast('error', 'Failed to load categories from cloud');
         }
       }
@@ -70,7 +70,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
           try {
             await saveCategories(user.id, localCategories);
           } catch (error) {
-            console.error('Error syncing local categories to cloud:', error);
+            
             showToast('error', 'Failed to sync categories to cloud');
           }
         }
@@ -79,11 +79,11 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         // Check if this is the first login
         const isFirstLogin = await AsyncStorage.getItem(`first_login_${user.id}`) === null;
         if (isFirstLogin) {
-          console.log('First login detected with no local categories, default categories will be created by auth provider');
+          
         }
       }
     } catch (error) {
-      console.error('Error loading categories:', error);
+      
       showToast('error', 'Failed to load categories');
     } finally {
       setIsLoading(false);
@@ -104,9 +104,9 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
       // Only attempt cloud save if not in guest mode and have a user ID
       if (!isGuest && user?.id) {
         try {
-          console.log('Attempting cloud save for user:', user.id);
+          
           await saveCategories(user.id, newCategories);
-          console.log('Cloud save successful');
+          
         } catch (error) {
           console.error('Error during cloud save:', {
             error: error instanceof Error ? error.message : 'Unknown error',
@@ -116,16 +116,16 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      console.log('=== END: saveCategoriesData - Success ===');
+      
     } catch (error) {
-      console.error('=== ERROR: saveCategoriesData ===', error);
+      
       throw error;
     }
   };
 
 
   const addCategory = async (category: Category) => {
-    console.log('=== START: addCategory ===');
+    
     console.log('Adding category:', {
       name: category.name,
       id: category.id,
@@ -144,7 +144,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
       
       // Show success toast
       showToast('success', 'Category added successfully');
-      console.log('=== END: addCategory - Success ===');
+      
     } catch (error) {
       console.error('=== ERROR: addCategory ===', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -174,7 +174,7 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAllCategories = async () => {
     try {
-      console.log('=== START: deleteAllCategories ===');
+      
       
       // Save empty array to local storage
       await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([]));
@@ -190,12 +190,12 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
             await deleteCategories(user.id, categoryIds);
           }
           
-          console.log('All categories deleted from cloud');
+          
           
           // Reset first login flag to ensure default categories are created on next login
           await AsyncStorage.removeItem(`first_login_${user.id}`);
         } catch (error) {
-          console.error('Error deleting categories from cloud:', error);
+          
           showToast('error', 'Failed to delete all categories from cloud');
           throw error;
         }
@@ -212,9 +212,9 @@ export function CategoryProvider({ children }: { children: React.ReactNode }) {
         showToast('info', 'Default categories will be restored on next login');
       }
       
-      console.log('=== END: deleteAllCategories - Success ===');
+      
     } catch (error) {
-      console.error('=== ERROR: deleteAllCategories ===', error);
+      
       showToast('error', 'Failed to delete all categories');
       throw error;
     }

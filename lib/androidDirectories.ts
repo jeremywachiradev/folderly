@@ -42,7 +42,7 @@ export const requestRootStorageAccess = async (): Promise<boolean> => {
     }
     return false;
   } catch (error) {
-    console.error('Error requesting root storage access:', error);
+    
     return false;
   }
 };
@@ -66,7 +66,7 @@ export const hasStoragePermissions = async (): Promise<boolean> => {
       return false;
     }
   } catch (error) {
-    console.error('Error checking permissions:', error);
+    
     return false;
   }
 };
@@ -89,7 +89,7 @@ export const requestAndroidPermissions = async (): Promise<{ granted: boolean; d
 
     return { granted: false };
   } catch (error) {
-    console.error('Error requesting permissions:', error);
+    
     return { granted: false };
   }
 };
@@ -109,14 +109,14 @@ export const validateDirectoryAccess = async (uri: string): Promise<boolean> => 
       return true;
     } catch (error) {
       // Log the warning but don't fail the validation
-      console.log(`Warning when validating directory access: ${uri}`, error);
+      
       
       // Return true anyway since the files might still be accessible
       // This prevents unnecessary permission prompts when files are actually accessible
       return true;
     }
   } catch (error) {
-    console.error('Error validating directory access:', error);
+    
     return false;
   }
 };
@@ -134,14 +134,14 @@ export const listDirectoryContents = async (uri: string): Promise<string[]> => {
       return await StorageAccessFramework.readDirectoryAsync(uri);
     } catch (error) {
       // Log the warning
-      console.log(`Warning when listing directory contents: ${uri}`, error);
+      
       
       // Return an empty array but don't throw an error
       // The app can still function even if we can't list the directory contents directly
       return [];
     }
   } catch (error) {
-    console.error('Error listing directory contents:', error);
+    
     return [];
   }
 };
@@ -159,7 +159,7 @@ export const openAndroidFilesSettings = async () => {
       }
     }
   } catch (error) {
-    console.error('Error opening settings:', error);
+    
     await Linking.openSettings();
   }
 };
@@ -198,7 +198,7 @@ export const requestManageAllFilesPermission = async () => {
     try {
       await IntentLauncher.startActivityAsync('android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION');
     } catch (error) {
-      console.error('Error requesting file access permission:', error);
+      
     }
   }
 };
@@ -212,7 +212,7 @@ export const checkDirectoryExists = async (path: string): Promise<boolean> => {
         return true;
       } catch (error) {
         // Log the error but don't fail - this is likely just a warning
-        console.log(`Warning when accessing directory: ${path}`, error);
+        
         
         // Even if we get an error reading the directory, we'll still return true
         // since you mentioned the files are still accessible
@@ -224,7 +224,7 @@ export const checkDirectoryExists = async (path: string): Promise<boolean> => {
       return true;
     }
   } catch (error) {
-    console.log(`Directory not accessible: ${path}`, error);
+    
     return false;
   }
 };

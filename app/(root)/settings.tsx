@@ -154,7 +154,7 @@ export default function SettingsScreen() {
       showToast('success', 'Default categories restored successfully');
       await loadCategories();
     } catch (error) {
-      console.error('Error restoring default categories:', error);
+      
       showToast('error', 'Failed to restore default categories');
     } finally {
       setIsRestoringCategories(false);
@@ -172,7 +172,7 @@ export default function SettingsScreen() {
       await deleteAllCategories();
       showToast('success', 'All categories deleted successfully');
     } catch (error) {
-      console.error('Error deleting all categories:', error);
+      
       showToast('error', 'Failed to delete all categories');
     } finally {
       setIsDeletingCategories(false);

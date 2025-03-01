@@ -1,6 +1,6 @@
 import { Client, Account, Databases, Storage, Avatars } from 'react-native-appwrite';
 
-console.log('=== Initializing Appwrite Client ===');
+
 
 const client = new Client();
 
@@ -15,13 +15,13 @@ export const config = {
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
 };
 
-// Log all environment variables (without sensitive values)
-console.log('Environment variables check:', {
-  hasEndpoint: !!process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
-  hasProjectId: !!process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
-  hasDatabaseId: !!process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-  hasUserCategoriesCollectionId: !!process.env.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID,
-});
+// Remove logging for production builds
+// console.log('Environment variables check:', {
+//   hasEndpoint: !!process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
+//   hasProjectId: !!process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
+//   hasDatabaseId: !!process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
+//   hasUserCategoriesCollectionId: !!process.env.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID,
+// });
 
 // Validate required configuration
 if (!config.endpoint || !config.projectId || !config.databaseId) {
@@ -33,20 +33,21 @@ if (!config.endpoint || !config.projectId || !config.databaseId) {
   throw new Error('Missing required Appwrite configuration');
 }
 
-console.log('Appwrite configuration loaded:', {
-  endpoint: config.endpoint,
-  projectId: config.projectId,
-  databaseId: config.databaseId
-});
+// For production builds, don't log configuration details
+// console.log('Appwrite configuration loaded:', {
+//   endpoint: config.endpoint,
+//   projectId: config.projectId,
+//   databaseId: config.databaseId
+// });
 
 try {
-  console.log('Setting up Appwrite client...');
+  
   client
     .setEndpoint(config.endpoint)
     .setProject(config.projectId);
-  console.log('Appwrite client setup completed');
+  
 } catch (error) {
-  console.error('Error setting up Appwrite client:', error);
+  
   throw error;
 }
 
@@ -57,17 +58,17 @@ export const avatars = new Avatars(client);
 
 // Verify database instance
 try {
-  console.log('Verifying database instance...');
+  
   if (!databases) {
     throw new Error('Database instance not created');
   }
-  console.log('Database instance verified');
+  
 } catch (error) {
-  console.error('Database verification failed:', error);
+  
   throw error;
 }
 
-console.log('=== Appwrite Initialization Complete ===');
+
 
 export { client };
 

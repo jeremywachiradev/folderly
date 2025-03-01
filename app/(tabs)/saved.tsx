@@ -116,7 +116,7 @@ export default function SavedScreen() {
           setIsLoading(false);
           return;
         } catch (error) {
-          console.error('Error setting save directory:', error);
+          
           showToast('error', 'Failed to set save directory');
           setIsLoading(false);
           return;
@@ -148,7 +148,7 @@ export default function SavedScreen() {
         return mappedFiles;
       });
     } catch (error) {
-      console.error('Error loading saved files:', error);
+      
       showToast('error', 'Failed to load saved files');
     } finally {
       setIsLoading(false);
@@ -176,7 +176,7 @@ export default function SavedScreen() {
         showToast('error', 'Permission denied to access directory');
       }
     } catch (error) {
-      console.error('Error setting save directory:', error);
+      
       showToast('error', 'Failed to set save directory');
     } finally {
       setIsLoading(false);

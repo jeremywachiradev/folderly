@@ -31,12 +31,12 @@ export const showDialog = ({ title, message, buttons }: ShowDialogOptions): Prom
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export const showToast = (type: ToastType, message: string) => {
-  console.log('Showing toast:', { type, message });
+  
   Toast.show({
     type,
     text1: message,
     position: 'bottom',
     visibilityTime: 3000,
   });
-  console.log('Toast shown');
+  
 }; 

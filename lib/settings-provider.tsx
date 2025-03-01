@@ -46,7 +46,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings(localSettings);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      
       showToast('error', 'Failed to load settings');
     } finally {
       setIsLoading(false);
@@ -58,7 +58,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       // Save to local storage
       await AsyncStorage.setItem('settings', JSON.stringify(newSettings));
     } catch (error) {
-      console.error('Error saving settings:', error);
+      
       throw error;
     }
   };

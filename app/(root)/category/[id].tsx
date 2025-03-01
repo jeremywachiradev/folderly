@@ -103,7 +103,7 @@ export default function CategoryScreen() {
       showToast('success', 'Category deleted successfully');
       router.push('/');
     } catch (error) {
-      console.error('Error deleting category:', error);
+      
       showToast('error', 'Failed to delete category');
     } finally {
       setIsDeleting(false);

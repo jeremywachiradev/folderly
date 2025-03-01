@@ -49,7 +49,7 @@ export function FileItem({ file, selected, onPress, onLongPress }: FileItemProps
       await saveFile(file.uri, file.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
-      console.error('Error saving file:', error);
+      
       showToast('error', 'Failed to save file');
     }
   };

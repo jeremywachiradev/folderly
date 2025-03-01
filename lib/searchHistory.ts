@@ -13,7 +13,7 @@ export const getSearchHistory = async (): Promise<SearchHistoryItem[]> => {
     const data = await AsyncStorage.getItem(SEARCH_HISTORY_KEY);
     return data ? JSON.parse(data) : [];
   } catch (error) {
-    console.error('Error getting search history:', error);
+    
     return [];
   }
 };
@@ -35,7 +35,7 @@ export const addToSearchHistory = async (query: string): Promise<void> => {
     
     await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory));
   } catch (error) {
-    console.error('Error adding to search history:', error);
+    
   }
 };
 
@@ -43,6 +43,6 @@ export const clearSearchHistory = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
   } catch (error) {
-    console.error('Error clearing search history:', error);
+    
   }
 }; 

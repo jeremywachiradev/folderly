@@ -49,7 +49,7 @@ export default function OnboardingScreen() {
         router.replace("/sign-in");
       }
     } catch (e) {
-      console.log("Error saving to AsyncStorage:", e);
+      
     }
   };
 

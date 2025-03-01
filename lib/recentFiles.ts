@@ -38,7 +38,7 @@ export async function addRecentFile(file: FileItem): Promise<void> {
     await AsyncStorage.setItem(RECENT_FILES_KEY, JSON.stringify(updated));
   } catch (error) {
     const err = error as StorageError;
-    console.error('Error adding recent file:', err.message);
+    
     throw new Error(`Failed to add recent file: ${err.message}`);
   }
 }
@@ -90,7 +90,7 @@ export async function getRecentFiles(): Promise<FileItem[]> {
     return filtered;
   } catch (error) {
     const err = error as StorageError;
-    console.error('Error getting recent files:', err.message);
+    
     return [];
   }
 }
@@ -100,7 +100,7 @@ export async function clearRecentFiles(): Promise<void> {
     await AsyncStorage.removeItem(RECENT_FILES_KEY);
   } catch (error) {
     const err = error as StorageError;
-    console.error('Error clearing recent files:', err.message);
+    
     throw new Error(`Failed to clear recent files: ${err.message}`);
   }
 }
@@ -116,7 +116,7 @@ export async function removeRecentFile(uri: string): Promise<void> {
     await AsyncStorage.setItem(RECENT_FILES_KEY, JSON.stringify(filtered));
   } catch (error) {
     const err = error as StorageError;
-    console.error('Error removing recent file:', err.message);
+    
     throw new Error(`Failed to remove recent file: ${err.message}`);
   }
 } 

@@ -112,7 +112,7 @@ const FileListItem = memo(({
       await saveFile(item.uri, item.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
-      console.error('Error saving file:', error);
+      
       showToast('error', 'Failed to save file');
     }
   }, [item.uri, item.name, dialog, isSelectionMode]);
@@ -525,7 +525,7 @@ export function FileList({
       setIsFileSelectionMode(false);
       setSelectedFiles(new Set());
     } catch (error) {
-      console.error('Error saving files:', error);
+      
       showToast('error', 'Failed to save files');
     } finally {
       setIsSavingBatch(false);

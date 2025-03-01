@@ -125,7 +125,7 @@ const migrateConfig = (config: any): FolderlyConfig => {
     try {
       currentConfig = migration.migrate(currentConfig);
     } catch (error) {
-      console.error(`Migration from ${migration.from} to ${migration.to} failed:`, error);
+      
       throw new Error(`Failed to migrate configuration from version ${migration.from}`);
     }
   }
@@ -165,7 +165,7 @@ export const exportConfig = async (
       throw new Error('Sharing is not available on this device');
     }
   } catch (error) {
-    console.error('Error exporting configuration:', error);
+    
     showToast('error', error instanceof Error ? error.message : 'Failed to export configuration');
   }
 };
@@ -216,7 +216,7 @@ export const importConfig = async (): Promise<FolderlyConfig | null> => {
     }
     return null;
   } catch (error) {
-    console.error('Error importing configuration:', error);
+    
     showToast('error', error instanceof Error
       ? error.message
       : 'Failed to import configuration. Please make sure the file is a valid Folderly configuration.');

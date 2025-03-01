@@ -30,7 +30,7 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
         }
       }
     } catch (error) {
-      console.error('Error loading existing directories:', error);
+      
     }
   };
 
@@ -116,7 +116,7 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
             );
           }
         } catch (error) {
-          console.error('Error verifying directory access:', error);
+          
           showToast('error', 'Could not access the selected directory. Please try again.');
           onClose();
           return;
@@ -125,7 +125,7 @@ export default function DirectoryPicker({ mode = 'single', onClose }: DirectoryP
       // Always close after selection
       onClose();
     } catch (error) {
-      console.error('Error picking directory:', error);
+      
       showToast('error', 'Failed to select directory. Please try again.');
       onClose();
     }

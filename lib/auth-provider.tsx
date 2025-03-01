@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { account, avatars } from './appwrite';
-import { initializeUserConfig, deleteUserCategories } from './config-sync';
+import { initializeUserConfig } from './config-sync';
 import { showToast } from './notifications';
 import { createCategory, getCategories, Category } from './categoryManager';
 import { pathToSafUri } from './androidDirectories';
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           await account.getSession('current');
         } catch (sessionError) {
-          console.log('Session expired, cleaning up...');
+          
           await signOut();
           return;
         }
@@ -95,11 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Store last successful auth timestamp
         await AsyncStorage.setItem('last_successful_auth', Date.now().toString());
       } catch (sessionError) {
-        console.log('No active session found:', sessionError);
+        
         await cleanupUserData();
       }
     } catch (error) {
-      console.log('Error checking session:', error);
+      
       await cleanupUserData();
     } finally {
       setIsLoading(false);
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'guest_categories' // Remove guest categories when logging out
       ]);
     } catch (error) {
-      console.error('Error cleaning up user data:', error);
+      
     }
   };
 
@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // If user already has categories, don't create default ones
       if (existingCategories.length > 0) {
-        console.log('User already has categories, skipping default category creation');
+        
         return;
       }
       
@@ -142,11 +142,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Only proceed if it's the first login or there are no categories
       if (!isFirstLogin && existingCategories.length > 0) {
-        console.log('Not first login and user has categories, skipping default category creation');
+        
         return;
       }
       
-      console.log('Creating default categories for user:', userId);
+      
       
       // Create Telegram category
       await createCategory(
@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ],
         userId
       );
-      console.log('Created default Telegram category');
+      
       
       // Create WhatsApp category
       await createCategory(
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ],
         userId
       );
-      console.log('Created default WhatsApp category');
+      
       
       // Store both as default categories
       await AsyncStorage.setItem('defaultCategories', JSON.stringify(['telegram', 'whatsapp']));
@@ -203,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem('@folderly/selected_categories', JSON.stringify(selectedCategoryIds));
       
     } catch (error) {
-      console.error('Error creating default categories:', error);
+      
       // Don't throw error, just log it
     }
   };
@@ -231,14 +231,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userData);
     } catch (error) {
-      console.error('Error signing in:', error);
+      
       throw error;
     }
   };
 
   const signInWithGoogle = async () => {
     try {
-      console.log('Starting Google sign-in process...');
+      
       
       // Clean up any existing sessions before starting new auth
       await cleanupUserData();
@@ -324,9 +324,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem('last_successful_auth', Date.now().toString());
       
     } catch (error) {
-      console.error('Error in signInWithGoogle:', error);
+      
       if (error instanceof Error) {
-        console.error('Error details:', error.message);
+        
       }
       await cleanupUserData();
       throw new Error('Failed to complete Google sign-in. Please try again.');
@@ -335,15 +335,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleOAuthCallback = async (response: any) => {
     try {
-      console.log('Handling OAuth callback with response:', response);
+      
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const session = await account.get();
-      console.log('Got user session:', session);
+      
       
       const compatibleUserId = await generateCompatibleUserId(session.$id);
-      console.log('Generated compatible user ID:', compatibleUserId);
+      
       
       await account.updatePrefs({
         originalUserId: session.$id,
@@ -360,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: session.$updatedAt,
       });
       
-      console.log('Successfully set user in state');
+      
 
       // Initialize user config in Appwrite
       await initializeUserConfig(compatibleUserId);
@@ -368,9 +368,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Create default categories if needed
       await createDefaultCategoriesIfNeeded(compatibleUserId);
     } catch (error) {
-      console.error('Error in handleOAuthCallback:', error);
+      
       if (error instanceof Error) {
-        console.error('Error details:', error.message);
+        
       }
       throw error;
     }
@@ -418,9 +418,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updatedCategories = await getCategories();
       await AsyncStorage.setItem('guest_categories', JSON.stringify(updatedCategories));
       
-      console.log('Guest mode setup completed');
+      
     } catch (error) {
-      console.error('Error setting guest mode:', error);
+      
       // Reset states on error
       setIsGuest(false);
       setUser(null);
@@ -473,7 +473,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Save locally only
         const categories = await getCategories();
         await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([...categories, newCategory]));
-        console.log('Created default Telegram category for guest (local only)');
       }
       
       // Create WhatsApp category if it doesn't exist
@@ -504,7 +503,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Save locally only
         const categories = await getCategories();
         await AsyncStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify([...categories, newCategory]));
-        console.log('Created default WhatsApp category for guest (local only)');
       }
       
       // Store default categories for future reference
@@ -518,7 +516,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem('@folderly/selected_categories', JSON.stringify(selectedCategoryIds));
       
     } catch (error) {
-      console.error('Error creating default categories for guest:', error);
+      
       // Don't throw error, just log it
     }
   };
@@ -531,7 +529,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isGuest) {
         const currentCategories = await getCategories();
         await AsyncStorage.setItem('guest_categories', JSON.stringify(currentCategories));
-        console.log('Guest categories backed up for future guest sessions');
+        
       }
       
       // Delete all sessions instead of just current
@@ -543,15 +541,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           )
         );
       } catch (error) {
-        console.log('Error deleting sessions:', error);
+        
         // Continue with cleanup even if session deletion fails
       }
       
       await cleanupUserData();
       
-      console.log('Sign out complete');
+      
     } catch (error) {
-      console.error('Error signing out:', error);
+      
       throw error;
     } finally {
       setIsLoading(false);

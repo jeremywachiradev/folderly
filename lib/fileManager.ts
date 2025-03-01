@@ -43,7 +43,7 @@ const loadMetadata = async () => {
       metadataCache = JSON.parse(stored);
     }
   } catch (error) {
-    console.warn('Error loading file metadata:', error);
+    
   }
   
   isMetadataLoaded = true;
@@ -54,7 +54,7 @@ const saveMetadata = async () => {
   try {
     await AsyncStorage.setItem(METADATA_STORAGE_KEY, JSON.stringify(metadataCache));
   } catch (error) {
-    console.warn('Error saving file metadata:', error);
+    
   }
 };
 
@@ -158,7 +158,7 @@ const getFileInfo = async (uri: string): Promise<FileInfoResult | null> => {
 
     return result;
   } catch (error) {
-    console.warn('Error getting file info:', error);
+    
     return null;
   }
 };
@@ -224,7 +224,7 @@ export async function listFiles(
 
         allFiles.push(...processedFiles);
       } catch (error) {
-        console.warn('Error reading directory:', directory.uri, error);
+        
       }
     }));
 
@@ -250,7 +250,7 @@ export async function listFiles(
       hasMore: end < allFiles.length
     };
   } catch (error) {
-    console.error('Error listing files:', error);
+    
     throw error;
   }
 }

@@ -118,7 +118,7 @@ export const checkAndRequestPermission = async (
     
     return requestPermissionWithContext(permissionType);
   } catch (error) {
-    console.error('Error checking permissions:', error);
+    
     return false;
   }
 }; 

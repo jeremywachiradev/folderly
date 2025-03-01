@@ -13,9 +13,9 @@ export const initializeUserConfig = async (userId: string): Promise<void> => {
     if (!userId) {
       throw new Error('Invalid user ID');
     }
-    console.log('User categories initialization complete for:', userId);
+    
   } catch (error) {
-    console.error('Error initializing user config:', error);
+    
     throw error;
   }
 };
@@ -44,7 +44,7 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
       [Query.equal('userId', userId)]
     );
 
-    console.log('Found existing documents:', existingDocs.documents.length);
+    
 
     // Delete all existing categories for this user first
     for (const doc of existingDocs.documents) {
@@ -68,7 +68,7 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
       
       // Check if the string is too long
       if (directoriesString.length > 2000) {
-        console.log(`Directories string too long (${directoriesString.length} chars), storing locally only`);
+        // Skip directories that are too long
         continue;
       }
       
@@ -103,14 +103,14 @@ export const saveCategories = async (userId: string, categories: Category[]): Pr
           categoryId: category.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
-        console.log(`Skipping cloud sync for category "${category.name}" due to error`);
+        
       }
     }
 
-    console.log('=== saveCategories completed successfully ===');
+    
   } catch (error) {
-    console.error('Error in saveCategories:', error);
-    console.log('Failed to save categories to cloud, but they are saved locally');
+    
+    
     throw error;
   }
 };
@@ -183,7 +183,7 @@ export const loadCategories = async (userId: string): Promise<Category[]> => {
 
     // If no categories exist for this user, create default ones
     if (docs.documents.length === 0) {
-      console.log('No categories found for user, creating defaults...');
+      
       const defaultCats = await createDefaultCategories(userId);
       await saveCategories(userId, defaultCats);
       return defaultCats;
@@ -199,7 +199,7 @@ export const loadCategories = async (userId: string): Promise<Category[]> => {
       isChecked: doc.isChecked ?? true // Default to true if not specified
     }));
   } catch (error) {
-    console.error('Error loading categories:', error);
+    
     showToast('error', 'Failed to load categories from cloud');
     throw error;
   }
@@ -232,9 +232,9 @@ export const deleteUserCategories = async (userId: string): Promise<void> => {
       )
     );
 
-    console.log(`Successfully deleted all categories for user: ${userId}`);
+    
   } catch (error) {
-    console.error('Error deleting user categories:', error);
+    
     showToast('error', 'Failed to delete categories from cloud');
     throw error;
   }
@@ -263,7 +263,7 @@ export const deleteCategories = async (userId: string, categoryIds: string[]): P
       )
     );
   } catch (error) {
-    console.error('Error deleting categories:', error);
+    
     showToast('error', 'Failed to delete categories from cloud');
     throw error;
   }

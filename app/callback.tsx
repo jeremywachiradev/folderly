@@ -15,7 +15,7 @@ export default function CallbackScreen() {
         await handleOAuthCallback(params);
         router.replace('/(root)/(tabs)');
       } catch (error) {
-        console.error('Error handling callback:', error);
+        
         router.replace('/sign-in');
       }
     };

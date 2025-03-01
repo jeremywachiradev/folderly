@@ -37,7 +37,7 @@ export const shareFile = async (
       UTI: options?.UTI
     });
   } catch (error) {
-    console.error('Error sharing file:', error);
+    
     throw error;
   }
 }; 

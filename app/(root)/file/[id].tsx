@@ -163,7 +163,7 @@ const useFileCache = () => {
       cache.set(uri, { uri: cachedPath, timestamp: Date.now() });
       return cachedPath;
     } catch (error) {
-      console.warn('Failed to cache file:', error);
+      
       return uri;
     }
   }, []);
@@ -317,7 +317,7 @@ export default function FileViewerScreen() {
     try {
       return atob(id as string);
     } catch (e) {
-      console.error('Failed to decode URI:', e);
+      
       return '';
     }
   }, [id]);
@@ -328,7 +328,7 @@ export default function FileViewerScreen() {
       const fileName = decoded.split('/').pop() || '';
       return fileName.toLowerCase();
     } catch (error) {
-      console.error('Error normalizing URI:', error);
+      
       return uri.toLowerCase();
     }
   };
@@ -409,7 +409,7 @@ export default function FileViewerScreen() {
         setCachedUri(uri);
         setMediaUri(uri);
       } catch (error) {
-        console.error('Failed to load file:', error);
+        
         setMediaError('Failed to load file');
       } finally {
         setIsMediaLoading(false);
@@ -458,13 +458,13 @@ export default function FileViewerScreen() {
           }
           throw new Error('File not accessible');
         } catch (error) {
-          console.error('File access error:', error);
+          
           throw error;
         }
       }
       return uri;
     } catch (error) {
-      console.error('Error getting media URI:', error);
+      
       throw error;
     }
   };
@@ -504,12 +504,12 @@ export default function FileViewerScreen() {
   };
 
   const handleMediaError = (error: any, type: string) => {
-    console.error(`${type} loading error:`, error);
+    
     setMediaError(`Failed to load ${type.toLowerCase()}`);
     
     // If using a cached file that failed, try the original URI
     if (mediaUri && mediaUri.startsWith('file://') && file?.uri) {
-      console.log('Trying original URI as fallback');
+      
       setMediaUri(file.uri);
     }
   };
@@ -585,7 +585,7 @@ export default function FileViewerScreen() {
                   transition={200}
                   className="bg-neutral-100 dark:bg-neutral-900"
                   onError={(error: ImageErrorEventData) => {
-                    console.error('Image loading error:', error);
+                    
                     handleMediaError(error, 'Image');
                   }}
                   onLoad={() => setIsMediaLoading(false)}
@@ -623,7 +623,7 @@ export default function FileViewerScreen() {
                       }
                     }
                   } catch (error) {
-                    console.error('Audio playback error:', error);
+                    
                     setMediaError('Failed to play audio');
                   }
                 }}
@@ -734,7 +734,7 @@ export default function FileViewerScreen() {
         setCurrentFile(newFile);
         setMediaUri(decodedUri);
       } catch (error) {
-        console.error('Error loading file:', error);
+        
         setMediaError(error instanceof Error ? error.message : 'Failed to load file');
       } finally {
         setIsMediaLoading(false);
@@ -758,7 +758,7 @@ export default function FileViewerScreen() {
         dialogTitle: `Share ${file.name}`
       });
     } catch (error) {
-      console.error('Share error:', error);
+      
       showToast('error', 'Failed to share file. Please try again.');
     }
   };
@@ -828,7 +828,7 @@ export default function FileViewerScreen() {
       await saveFile(fileUri, file?.name || 'file');
       showToast('success', 'File saved successfully');
     } catch (error) {
-      console.error('Error saving file:', error);
+      
       showToast('error', 'Failed to save file');
     } finally {
       setIsSaving(false);

@@ -126,7 +126,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
         await AsyncStorage.removeItem('@folderly/selected_directories');
       }
     } catch (error) {
-      console.error('Error checking for selected directory:', error);
+      
     }
   };
 
@@ -149,7 +149,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
             await StorageAccessFramework.readDirectoryAsync(dir.path);
             validatedDirs[i] = { ...dir, validated: true };
           } catch (error) {
-            console.log(`Directory not accessible: ${dir.path}`);
+            
             hasInvalidDir = true;
             
             // Show a user-friendly message for default directories
@@ -189,7 +189,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
           validatedDirs[i] = { ...dir, validated: true };
         }
       } catch (error) {
-        console.error(`Error validating directory ${dir.path}:`, error);
+        
       }
     }
     
@@ -247,7 +247,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
 
       router.back();
     } catch (error) {
-      console.error('Error saving category:', error);
+      
       showToast('error', error instanceof Error ? error.message : 'Failed to save category');
     } finally {
       setIsSaving(false);
@@ -284,7 +284,7 @@ export default function CategoryForm({ category, isEditing = false, loading = fa
       };
       await AsyncStorage.setItem('@folderly/category_form_state', JSON.stringify(formState));
     } catch (error) {
-      console.error('Error saving form state:', error);
+      
     }
 
     router.push({

@@ -29,7 +29,7 @@ export default function SignInScreen() {
         try {
           await router.replace('/(tabs)');
         } catch (error) {
-          console.error('Navigation error:', error);
+          
           // Reset navigation state if navigation fails
           setHasNavigated(false);
         }
@@ -41,11 +41,11 @@ export default function SignInScreen() {
   // Handle the OAuth callback
   useEffect(() => {
     if (!isLoading && userId && secret) {
-      console.log('Received OAuth callback params:', { userId, secret });
+      
       handleOAuthCallback({ userId, secret }).then(() => {
-        console.log('OAuth callback handled successfully');
+        
       }).catch((error) => {
-        console.error('Error handling OAuth callback:', error);
+        
         alert('Failed to complete sign in. Please try again.');
       });
     }
@@ -59,13 +59,13 @@ export default function SignInScreen() {
     
     try {
       setIsAuthenticating(true);
-      console.log('Starting Google sign-in...');
+      
       await signInWithGoogle();
-      console.log('Google sign-in completed successfully');
+      
     } catch (e) {
-      console.error("Error in handleGoogleSignIn:", e);
+      
       if (e instanceof Error) {
-        console.error('Error details:', e.message);
+        
       }
       showToast('error', 'Failed to start sign in. Please try again.');
       setIsAuthenticating(false);
@@ -77,16 +77,16 @@ export default function SignInScreen() {
     
     try {
       setIsAuthenticating(true);
-      console.log('Setting guest mode...');
+      
       await setGuestMode();
-      console.log('Guest mode set successfully');
+      
       
       // Reset authenticating state after guest mode is set
       setIsAuthenticating(false);
     } catch (error) {
-      console.error("Error in handleContinueAsGuest:", error);
+      
       if (error instanceof Error) {
-        console.error('Error details:', error.message);
+        
       }
       showToast('error', 'Failed to continue as guest. Please try again.');
       setIsAuthenticating(false);

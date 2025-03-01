@@ -100,7 +100,7 @@ export default function HomeScreen() {
           );
         }
       } catch (error) {
-        console.error('Error loading selected categories:', error);
+        
         // Default to all categories if there's an error
         setSelectedCategories(new Set(categories.map(cat => cat.id)));
       }
@@ -212,7 +212,7 @@ export default function HomeScreen() {
       setHasMore(more);
       setPage(pageNum);
     } catch (error) {
-      console.error('Error loading files:', error);
+      
       dialog.showDialog({
         title: 'Error',
         message: 'Failed to load files',
@@ -274,7 +274,7 @@ export default function HomeScreen() {
           JSON.stringify(Array.from(newSelectedCategories))
         );
       } catch (error) {
-        console.error('Error saving selected categories:', error);
+        
       }
       
       // Only update the category list UI without forcing a full refresh
@@ -321,7 +321,7 @@ export default function HomeScreen() {
         setHasMore(more);
         setPage(1);
       } catch (error) {
-        console.error('Error loading files after category selection change:', error);
+        
       } finally {
         setIsLoadingFiles(false);
       }
@@ -469,7 +469,7 @@ export default function HomeScreen() {
       // Implement file deletion logic
       loadFiles(1, true);
     } catch (error) {
-      console.error('Error deleting file:', error);
+      
       dialog.showDialog({
         title: 'Error',
         message: 'Failed to delete file',
@@ -483,7 +483,7 @@ export default function HomeScreen() {
       // Implement file renaming logic
       loadFiles(1, true);
     } catch (error) {
-      console.error('Error renaming file:', error);
+      
       dialog.showDialog({
         title: 'Error',
         message: 'Failed to rename file',
@@ -516,7 +516,7 @@ export default function HomeScreen() {
       await saveFile(file.uri, file.name);
       showToast('success', 'File saved successfully');
     } catch (error) {
-      console.error('Error saving file:', error);
+      
       showToast('error', 'Failed to save file');
     }
   };
@@ -545,7 +545,7 @@ export default function HomeScreen() {
       await saveFiles(files.map(file => ({ uri: file.uri, name: file.name })));
       showToast('success', `Successfully saved ${files.length} file${files.length > 1 ? 's' : ''}`);
     } catch (error) {
-      console.error('Error saving files:', error);
+      
       showToast('error', 'Failed to save files');
     }
     setIsFileSelectionMode(false);

@@ -46,7 +46,7 @@ export const getFilesFromDirectory = async (directory: string): Promise<FileItem
     if (!hasPermission) {
       const { granted } = await requestAndroidPermissions();
       if (!granted) {
-        console.error('Root storage permission not granted');
+        
         return [];
       }
     }
@@ -88,7 +88,7 @@ export const getFilesFromDirectory = async (directory: string): Promise<FileItem
               isDirectory: fileInfo.isDirectory
             };
           } catch (error) {
-            console.error('Error processing file:', error);
+            
             return null;
           }
         })
@@ -96,11 +96,11 @@ export const getFilesFromDirectory = async (directory: string): Promise<FileItem
 
       return fileItems.filter((item): item is FileItem => item !== null);
     } catch (error) {
-      console.error('Error reading SAF directory:', error);
+      
       throw error;
     }
   } catch (error) {
-    console.error('Error in getFilesFromDirectory:', error);
+    
     return [];
   }
 };
@@ -114,7 +114,7 @@ export const requestPermissions = async () => {
     }
     return true;
   } catch (error) {
-    console.error('Error requesting permissions:', error);
+    
     return false;
   }
 };
@@ -134,7 +134,7 @@ export const copyFile = async (sourceUri: string, destinationUri: string) => {
     await StorageAccessFramework.createFileAsync(destinationUri, content, 'utf8');
     return true;
   } catch (error) {
-    console.error('Error copying file:', error);
+    
     return false;
   }
 };
@@ -172,11 +172,11 @@ export const getFileStats = async (uri: string) => {
         };
       }
     } catch (error) {
-      console.error('Error getting file stats:', error);
+      
       return null;
     }
   } catch (error) {
-    console.error('Error getting file stats:', error);
+    
     return null;
   }
 };
@@ -187,7 +187,7 @@ export const getSaveDirectory = async (): Promise<string | null> => {
   try {
     return await AsyncStorage.getItem(SAVE_DIRECTORY_KEY);
   } catch (error) {
-    console.error('Error getting save directory:', error);
+    
     return null;
   }
 };
@@ -196,7 +196,7 @@ export const setSaveDirectory = async (directory: string): Promise<void> => {
   try {
     await AsyncStorage.setItem(SAVE_DIRECTORY_KEY, directory);
   } catch (error) {
-    console.error('Error setting save directory:', error);
+    
     throw error;
   }
 };
@@ -227,7 +227,7 @@ export const saveFile = async (sourceUri: string, fileName: string): Promise<voi
       { encoding: FileSystem.EncodingType.Base64 }
     );
   } catch (error) {
-    console.error('Error saving file:', error);
+    
     throw error;
   }
 };
@@ -263,7 +263,7 @@ export const saveFiles = async (files: { uri: string; name: string }[]): Promise
       })
     );
   } catch (error) {
-    console.error('Error saving files:', error);
+    
     throw error;
   }
 };
@@ -281,7 +281,7 @@ export const getContentUri = async (uri: string): Promise<string> => {
     }
     return uri;
   } catch (error) {
-    console.error('Error getting content URI:', error);
+    
     throw error;
   }
 }; 
