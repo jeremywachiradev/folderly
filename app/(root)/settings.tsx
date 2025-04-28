@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/lib/theme-provider';
-import { Text, Card } from '@/components/ui';
+import { Text, Card, DeveloperTag } from '@/components/ui';
 import { getSaveDirectory, setSaveDirectory } from '@/lib/fileSystem';
 import { StorageAccessFramework } from 'expo-file-system';
 import { showDialog, showToast } from '@/lib/notifications';
@@ -313,6 +313,23 @@ export default function SettingsScreen() {
                     color="#ef4444"
                   />
                 </TouchableOpacity>
+              </View>
+            </View>
+          </Card>
+
+          {/* Developer Info */}
+          <Card variant="elevated" className="m-4 mb-20">
+            <View className="p-6">
+              <Text variant="h4" weight="medium" className="mb-4 text-neutral-900 dark:text-white">
+                About
+              </Text>
+              
+              <Text variant="body" className="mb-6 text-neutral-600 dark:text-neutral-400">
+                Folderly helps you organize and manage your files across different folders on your device.
+              </Text>
+              
+              <View className="items-center">
+                <DeveloperTag />
               </View>
             </View>
           </Card>
