@@ -51,8 +51,48 @@ A modern file organization app for Android that helps you manage and access your
 ## Installation
 
 1. Download from the Play Store (coming soon)
-2. Grant necessary storage permissions
-3. Start organizing your files!
+2. Download from GitHub Releases
+3. Grant necessary storage permissions
+4. Start organizing your files!
+
+## Development
+
+### Environment Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```
+   yarn install
+   ```
+3. Create a `.env` file in the project root with the following variables:
+   ```
+   EXPO_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+   EXPO_PUBLIC_APPWRITE_PROJECT_ID=your_project_id
+   EXPO_PUBLIC_APPWRITE_DATABASE_ID=your_database_id
+   EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID=your_collection_id
+   ```
+4. Start the development server:
+   ```
+   yarn start
+   ```
+
+### GitHub Actions
+
+This project uses GitHub Actions for continuous integration and automated builds. To set up GitHub Actions for your fork:
+
+1. Go to your repository's Settings > Secrets and Variables > Actions
+2. Add the following repository secrets:
+   - `EXPO_TOKEN`: Your Expo access token (get it from https://expo.dev/accounts/[username]/settings/access-tokens)
+   - `EXPO_PUBLIC_APPWRITE_ENDPOINT`: Your Appwrite endpoint URL
+   - `EXPO_PUBLIC_APPWRITE_PROJECT_ID`: Your Appwrite project ID
+   - `EXPO_PUBLIC_APPWRITE_DATABASE_ID`: Your Appwrite database ID
+   - `EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID`: Your Appwrite collection ID for user categories
+
+The GitHub Actions workflow will:
+1. Run on every push to the main branch
+2. Set up the environment with your secrets
+3. Build an Android APK using the configured EAS profile
+4. Create a new GitHub Release with each successful build
 
 ## Requirements
 

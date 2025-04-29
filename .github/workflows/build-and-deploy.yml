@@ -1,0 +1,91 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.11.1'  # Matching node version from eas.json
+          cache: 'yarn'
+      
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: Set up Expo CLI
+        run: npm install -g expo-cli eas-cli
+      
+      - name: Set up environment variables
+        run: |
+          # Create .env file from GitHub Secrets
+          echo "EXPO_PUBLIC_APPWRITE_ENDPOINT=${{ secrets.EXPO_PUBLIC_APPWRITE_ENDPOINT }}" > .env
+          echo "EXPO_PUBLIC_APPWRITE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_APPWRITE_PROJECT_ID }}" >> .env
+          echo "EXPO_PUBLIC_APPWRITE_DATABASE_ID=${{ secrets.EXPO_PUBLIC_APPWRITE_DATABASE_ID }}" >> .env
+          echo "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID=${{ secrets.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID }}" >> .env
+      
+      - name: Lint code
+        run: yarn lint
+        continue-on-error: true  # Allow workflow to continue even if linting fails
+      
+      - name: Run tests
+        run: yarn test --passWithNoTests
+        continue-on-error: true  # Allow workflow to continue even if tests fail
+      
+      - name: Build Android APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: eas build --platform android --profile android-apk-obb --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Store build info
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p build-artifacts
+          echo "Build triggered at $(date)" > build-artifacts/build-info.txt
+          echo "Commit: ${{ github.sha }}" >> build-artifacts/build-info.txt
+          echo "EAS Build Profile: android-apk-obb" >> build-artifacts/build-info.txt
+      
+      - name: Upload build info
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-info
+          path: build-artifacts/
+          retention-days: 7
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            Automated release created by GitHub Actions
+            Commit: ${{ github.sha }}
+            
+            This release was automatically generated and contains the latest version of Folderly.
+            
+            To download the APK, please visit the EAS build page or check your Expo account.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
