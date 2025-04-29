@@ -48,6 +48,19 @@
         "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
       }
     },
+    "local-android": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
+      }
+    },
     "app-bundle": {
       "android": {
         "buildType": "app-bundle",
