@@ -1,13 +1,14 @@
 import { Client, Account, Databases, Storage, Avatars } from 'react-native-appwrite';
+import getConfig from './config';
 
-
-
+const configValues = getConfig();
 const client = new Client();
 
 export const config = {
-  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
-  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
-  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+  endpoint: configValues.appwriteEndpoint,
+  projectId: configValues.appwriteProjectId,
+  databaseId: configValues.appwriteDatabaseId,
+  userCategoriesCollectionId: configValues.appwriteUserCategoriesCollectionId,
   propertiesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
   agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
   reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
@@ -16,12 +17,12 @@ export const config = {
 };
 
 // Remove logging for production builds
-// console.log('Environment variables check:', {
-//   hasEndpoint: !!process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
-//   hasProjectId: !!process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
-//   hasDatabaseId: !!process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-//   hasUserCategoriesCollectionId: !!process.env.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID,
-// });
+console.log('Environment variables check:', {
+  hasEndpoint: !!config.endpoint,
+  hasProjectId: !!config.projectId,
+  hasDatabaseId: !!config.databaseId,
+  hasUserCategoriesCollectionId: !!config.userCategoriesCollectionId,
+});
 
 // Validate required configuration
 if (!config.endpoint || !config.projectId || !config.databaseId) {
@@ -34,20 +35,17 @@ if (!config.endpoint || !config.projectId || !config.databaseId) {
 }
 
 // For production builds, don't log configuration details
-// console.log('Appwrite configuration loaded:', {
-//   endpoint: config.endpoint,
-//   projectId: config.projectId,
-//   databaseId: config.databaseId
-// });
+console.log('Appwrite configuration loaded:', {
+  endpoint: config.endpoint,
+  projectId: config.projectId,
+  databaseId: config.databaseId
+});
 
 try {
-  
   client
     .setEndpoint(config.endpoint)
     .setProject(config.projectId);
-  
 } catch (error) {
-  
   throw error;
 }
 
@@ -58,17 +56,12 @@ export const avatars = new Avatars(client);
 
 // Verify database instance
 try {
-  
   if (!databases) {
     throw new Error('Database instance not created');
   }
-  
 } catch (error) {
-  
   throw error;
 }
-
-
 
 export { client };
 

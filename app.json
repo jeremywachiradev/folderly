@@ -61,7 +61,11 @@
       },
       "eas": {
         "projectId": "06abacaf-dc99-432b-99c4-3be1d97bda66"
-      }
+      },
+      "appwriteEndpoint": "https://cloud.appwrite.io/v1",
+      "appwriteProjectId": "6788eec10030d43b31c1",
+      "appwriteDatabaseId": "67b661af00086f1eb426",
+      "appwriteUserCategoriesCollectionId": "67b664ee000d9f64506f"
     }
   }
 }

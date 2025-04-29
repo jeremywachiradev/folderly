@@ -7,13 +7,31 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "20.11.1"
+      "node": "20.11.1",
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
+      }
     },
     "android-apk-obb": {
       "android": {
@@ -23,7 +41,11 @@
       },
       "env": {
         "GRADLE_OPTS": "-Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m'",
-        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false"
+        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false",
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
       }
     },
     "app-bundle": {
@@ -33,7 +55,11 @@
       },
       "env": {
         "GRADLE_OPTS": "-Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m'",
-        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false"
+        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false",
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6788eec10030d43b31c1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "67b661af00086f1eb426",
+        "EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID": "67b664ee000d9f64506f"
       }
     }
   },

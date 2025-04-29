@@ -1,11 +1,11 @@
-import { ID, Query,Permission, Role  } from 'appwrite';
+import { ID, Query, Permission, Role } from 'appwrite';
 import { databases, config as appwriteConfig } from './appwrite';
 import { Category } from './categoryManager';
 import { showToast } from './notifications';
 import { pathToSafUri } from './androidDirectories';
 
-// Use the collection ID from environment variables
-const USER_CATEGORIES_COLLECTION = process.env.EXPO_PUBLIC_APPWRITE_USER_CATEGORIES_COLLECTION_ID!;
+// Use the collection ID from the appwrite config
+const USER_CATEGORIES_COLLECTION = appwriteConfig.userCategoriesCollectionId;
 
 export const initializeUserConfig = async (userId: string): Promise<void> => {
   try {
