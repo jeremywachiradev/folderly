@@ -258,7 +258,7 @@ export default function ProfileScreen() {
         </Card>
       </ScrollView>
 
-      {/* Import Confirmation Modal */}
+      {/* Import Confirmation Modal thing */}
       <Portal>
         <PaperModal
           visible={showImportConfirm}
