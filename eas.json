@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "version": ">= 15.0.10",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "node": "20.11.1"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true
+    },
+    "android-apk-obb": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "image": "ubuntu-22.04-jdk-17-ndk-r25b"
+      },
+      "env": {
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m'",
+        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false"
+      }
+    },
+    "app-bundle": {
+      "android": {
+        "buildType": "app-bundle",
+        "image": "ubuntu-22.04-jdk-17-ndk-r25b"
+      },
+      "env": {
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m'",
+        "EXPO_ANDROID_EXTRA_GRADLE_PROPERTIES": "android.enableR8=false"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
