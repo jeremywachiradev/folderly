@@ -52,7 +52,8 @@
           "savePhotosPermission": "Allow Folderly to save photos.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {

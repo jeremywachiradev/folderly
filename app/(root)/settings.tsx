@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ScrollView, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -327,6 +327,21 @@ export default function SettingsScreen() {
               <Text variant="body" className="mb-6 text-neutral-600 dark:text-neutral-400">
                 Folderly helps you organize and manage your files across different folders on your device.
               </Text>
+              
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://github.com/jeremywachiradev/folderly.git')}
+                className="flex-row items-center justify-center p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg mb-6"
+              >
+                <Ionicons
+                  name="logo-github"
+                  size={24}
+                  color={isDarkMode ? '#ffffff' : '#000000'}
+                  style={{ marginRight: 10 }}
+                />
+                <Text variant="body" className="text-neutral-900 dark:text-white">
+                  Star on GitHub
+                </Text>
+              </TouchableOpacity>
               
               <View className="items-center">
                 <DeveloperTag />
