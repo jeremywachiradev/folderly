@@ -99,7 +99,7 @@ The GitHub Actions workflow will:
 - Android 6.0 (API level 23) or higher
 - Storage permissions for accessing files
 
-##Contribution
+##Contributing
 - Clone the repo and work on a branch of it locally with your changes
 - Pull request. I will review it and push it
 
